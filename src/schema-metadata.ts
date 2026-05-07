@@ -54,13 +54,37 @@ export function defineSchemaMetadata<
           throw new Error("Not implemented");
         },
         searchOne: async (query, profile) => {
-          console.log(`Executing searchOne on ${tableName} with query:`, query);
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+
+          if (hooks?.beforeSearch) {
+             await hooks.beforeSearch(query);
+          }
+
+          // Use buildSearchQueries with isPaginated=true and pageSize=1
+          const q = { ...query, page: 1, pageSize: 1 } as any;
+          const { mainQuery } = buildSearchQueries(q, translatorContext, true);
+          
+          const rawRows = await mainQuery;
+          const data = hydrateResults(rawRows, tableName, metadata);
+
+          if (hooks?.afterSearch) {
+             await hooks.afterSearch(query, data);
+          }
+
+          return data.length > 0 ? data[0] : null;
         },
         searchPage: async (query, profile) => {
           const page = query.page ?? 1;
           const pageSize = query.pageSize ?? 10;
           
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+
+          if (hooks?.beforeSearch) {
+             await hooks.beforeSearch(query);
+          }
+
           const { mainQuery, countQuery } = buildSearchQueries(query as any, translatorContext, true);
           
           // Execute Count query
@@ -69,8 +93,12 @@ export function defineSchemaMetadata<
           const totalPages = Math.ceil(totalItems / pageSize);
 
           if (totalItems === 0) {
+            const emptyResult: any[] = [];
+            if (hooks?.afterSearch) {
+               await hooks.afterSearch(query, emptyResult);
+            }
             return { 
-              data: [], 
+              data: emptyResult, 
               meta: { currentPage: page, pageSize, totalPages: 0, totalItems: 0 } 
             } as any;
           }
@@ -79,17 +107,32 @@ export function defineSchemaMetadata<
           const rawRows = await mainQuery;
           const data = hydrateResults(rawRows, tableName, metadata);
 
+          if (hooks?.afterSearch) {
+             await hooks.afterSearch(query, data);
+          }
+
           return { 
             data, 
             meta: { currentPage: page, pageSize, totalPages, totalItems } 
           } as any;
         },
         searchMany: async (query, profile) => {
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+
+          if (hooks?.beforeSearch) {
+             await hooks.beforeSearch(query);
+          }
+
           const { mainQuery } = buildSearchQueries(query as any, translatorContext, false);
           
           // Execute Main Query (which wraps the CTE) & Hydrate
           const rawRows = await mainQuery;
           const data = hydrateResults(rawRows, tableName, metadata);
+
+          if (hooks?.afterSearch) {
+             await hooks.afterSearch(query, data);
+          }
 
           return data;
         },

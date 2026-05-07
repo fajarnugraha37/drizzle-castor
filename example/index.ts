@@ -26,17 +26,17 @@ import {  } from "bun";
     logger: new DefaultLogger({
       writer: new (class implements Logger {
         logQuery(query: string, params: unknown[]): void {
-            console.log("=============== Drizzle ===============");
-            console.log("Executing query:");
-            console.log(query);
-            console.log("With params:");
-            console.log(params);
-            console.log("=======================================");
+            // console.log("=============== Drizzle ===============");
+            // console.log("Executing query:");
+            // console.log(query);
+            // console.log("With params:");
+            // console.log(params);
+            // console.log("=======================================");
         }
         write(message: string): void {
-            console.log("=============== Drizzle ===============");
-            console.log(message);
-            console.log("=======================================");
+            // console.log("=============== Drizzle ===============");
+            // console.log(message);
+            // console.log("=======================================");
         }
       })(),
     }),
@@ -106,11 +106,13 @@ async function main(db: any, args?: string[]) {
       ],
       hooks: {
         'beforeSearch': async (query): Promise<void> => {
-          console.log(`Before search hook triggered for users with query:`, query);
+          console.log(`[Hooks] Before search hook triggered`); 
+          // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
         },
         'afterSearch': async (query, result): Promise<void> => {
-          console.log(`After search hook triggered for users with query:`, query);
-          console.log(`Search result:`, result);
+          console.log(`[Hooks] After search hook triggered`);
+          // console.log(`[Hooks] After search hook triggered for users with query:`, query);
+          // console.log(`[Hooks] Search result:`, result[0].name);
         }
       }
     },
@@ -190,9 +192,9 @@ async function main(db: any, args?: string[]) {
   });
   const commentRepo = schemaMetadata.repoFactory("comments", {
   });
-  const users = await userRepo.searchPage({
-    page: 1,
-    pageSize: 10,
+  const users = await userRepo.searchOne({
+    // page: 1,
+    // pageSize: 10,
     filter: {
         $or: [
             { email: { $notLike: "Cierra_Hackett%" } },
@@ -212,16 +214,15 @@ async function main(db: any, args?: string[]) {
       "name", 
       "tags", 
       "email", 
-      "profile.bio",
-      "profile.avatarUrl",
-      "company.name",
-      "posts.title", 
-      "posts.comments.content",
-      "groups.name",
+      // "profile.bio",
+      // "profile.avatarUrl",
+      // "company.name",
+      // "posts.title", 
+      // "posts.comments.content",
+      // "groups.name",
     ],
   });
-  console.log("Page:", users.meta);
-  console.log("Users:", users.data.length, users.data[0]);
+  console.log("Users:", users);
 
   const comments = await commentRepo.searchMany({
     filter: {
