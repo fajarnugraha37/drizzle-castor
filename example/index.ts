@@ -65,47 +65,6 @@ async function main(db: any, args?: string[]) {
     groupsTable,
     userGroups,
   ] as const;
-  const _ = defineSchemaMetadata(db, tables);
-  const metadata = _({
-    users: {
-      oneToMany: [
-        {
-          relationName: "posts",
-          relatedTable: "posts",
-          localKey: "users.id",
-          foreignKey: "posts.userId",
-        },
-      ],
-      manyToMany: [
-        {
-          relationName: "groups",
-          joinTable: "users_to_groups",
-          localKey: "users.id",
-          joinLocalKey: "users_to_groups.userId",
-          relatedTable: "groups",
-          relatedKey: "groups.id",
-          joinRelatedKey: "users_to_groups.groupId",
-        },
-      ],
-    },
-  });
-  const repo = metadata.repoFactory("users", {});
-  const r = repo.searchOne;
-  const result = await repo.searchOne({
-    filter: {
-      $or: [
-        { email: { $like: "Cierra_Hackett%" } },
-        { "posts.title": { $like: "%sunt aut facere%" } },
-        { tags: { $in: ["tag1"] } },
-        { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
-      ],
-    },
-    'projection': [
-      'groups.name',
-      'age',
-    ]
-  });
-  console.log("Search result:", result?.age);
 
   const schemaMetadata = createSchemaBuilder(db, tables)
     .table("users", {
@@ -238,6 +197,9 @@ async function main(db: any, args?: string[]) {
       ],
     })
     .build();
+
+  type UsersMeta = (typeof schemaMetadata)["metadata"]["users"];
+  const checkMeta: UsersMeta = "invalid" as any;
     const userRepo = schemaMetadata.repoFactory('users', {});
     const commentRepo = schemaMetadata.repoFactory("comments", {});
     const rr = userRepo.searchOne;
@@ -291,9 +253,9 @@ async function main(db: any, args?: string[]) {
       "id",
       "content",
       "postId",
-      "posts.user.name",
-      "posts.title",
-      "posts.user.persona.hobbies",
+      "post.user.name",
+      "post.title",
+      "post.user.persona.hobbies",
     ],
   });
   console.log("Comments:", JSON.stringify(comments[0], null, 2));

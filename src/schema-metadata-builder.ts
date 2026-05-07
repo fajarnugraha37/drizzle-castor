@@ -4,7 +4,7 @@ import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata } from "./types"
 export class SchemaBuilder<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],
-  TMetadata extends TSchemaMetadata<TDb, TTables>,
+  TMetadata extends Record<string, any> = {},
 > {
   constructor(
     private db: TDb,
@@ -15,25 +15,22 @@ export class SchemaBuilder<
 
   table<
     TName extends TableName<TTables[number]>,
-    TConfig extends TSchemaMetadata<TDb, TTables>[TName],
-  >(tableName: TName, config: TConfig) {
+    const TConfig extends TSchemaMetadata<TDb, TTables>[TName],
+  >(tableName: TName, config: TConfig): SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }> {
     const metadataWithNewTable = {
       ...this.metadata,
       [tableName]: config,
     };
-    return new SchemaBuilder(
+    return new SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }>(
       this.db,
       this.tables,
       this.mode,
-      metadataWithNewTable,
+      metadataWithNewTable as any,
     );
   }
 
   build() {
-    const finalMetadata = this.metadata as unknown as TSchemaMetadata<
-      TDb,
-      TTables
-    >;
+    const finalMetadata = this.metadata as unknown as TMetadata;
     return defineSchemaMetadata(this.db, this.tables, this.mode)(finalMetadata);
   }
 }
