@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { createSchemaBuilder, defineSchemaMetadata } from "../";
-import type {  } from "../";
+import { createSchemaBuilder } from "../";
+import type {} from "../";
 import { seed } from "./seed";
 import {
   companiesTable,
@@ -208,21 +208,18 @@ async function main(db: any, args?: string[]) {
     })
     .build();
 
-  type UsersMeta = (typeof schemaMetadata)["metadata"]["users"];
-  const checkMeta: UsersMeta = "invalid" as any;
-    const userRepo = schemaMetadata.repoFactory('users', {});
-    const commentRepo = schemaMetadata.repoFactory("comments", {});
-    const rr = userRepo.searchOne;
+  const userRepo = schemaMetadata.repoFactory("users", {});
+  const commentRepo = schemaMetadata.repoFactory("comments", {});
   for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
     try {
-      const users = await userRepo.searchOne(
+      const users = await userRepo.searchPage(
         {
           filter: {
             $or: [
-              { email: { $like: "Cierra_Hackett%" } },
-              { "posts.title": { $like: "%sunt aut facere%" } },
-              { tags: { $in: ["tag1"] } },
-              { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
+              // { email: { $like: "Cierra_Hackett%" } },
+              // { "posts.title": { $like: "%sunt aut facere%" } },
+              // { tags: { $in: ["tag1"] } },
+              // { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
             ],
           },
           order: {
@@ -241,7 +238,15 @@ async function main(db: any, args?: string[]) {
             },
             persona: "desc",
           },
-          projection: ["id", "name", "tags", "email", "persona.hobbies", 'company.name', 'profile.bio'],
+          projection: [
+            "id",
+            "name",
+            "tags",
+            "email",
+            "persona.hobbies",
+            "company.name",
+            "profile.bio",
+          ],
         },
         profile as any,
       );
@@ -257,8 +262,7 @@ async function main(db: any, args?: string[]) {
   }
 
   const comments = await commentRepo.searchMany({
-    filter: {
-    },
+    filter: {},
     projection: [
       "id",
       "content",
@@ -270,48 +274,60 @@ async function main(db: any, args?: string[]) {
   });
   console.log("Comments:", JSON.stringify(comments[0], null, 2));
 
-  console.log("\n=== Testing createOne ===");
-  for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
-    try {
-      const newUser = await userRepo.createOne({
-        name: "New User CreateOne",
-        email: faker.internet.email(),
-        age: 25,
-        companyId: 1,
-        tags: ["new", "test"],
-        persona: { hobbies: ["coding"], skills: ["typescript"] }
-      }, "admin");
-      console.log("Created User:", JSON.stringify(newUser, null, 2));
-    } catch (err: any) {
-      console.error(`Error creating user with profile ${JSON.stringify(profile)}:`, err.message);
-    }
-  }
+  // console.log("\n=== Testing createOne ===");
+  // for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
+  //   try {
+  //     const newUser = await userRepo.createOne(
+  //       {
+  //         name: "New User CreateOne",
+  //         email: faker.internet.email(),
+  //         age: 25,
+  //         companyId: 1,
+  //         tags: ["new", "test"],
+  //         persona: { hobbies: ["coding"], skills: ["typescript"] },
+  //       },
+  //       "admin",
+  //     );
+  //     console.log("Created User:", JSON.stringify(newUser, null, 2));
+  //   } catch (err: any) {
+  //     console.error(
+  //       `Error creating user with profile ${JSON.stringify(profile)}:`,
+  //       err.message,
+  //     );
+  //   }
+  // }
 
-  console.log("\n=== Bulk createMany ===");
-  for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
-    try {
-      const newUsers = await userRepo.createMany([
-        {
-          name: "Bulk " + faker.person.fullName(),
-          email: faker.internet.email(),
-          age: faker.number.int({ min: 18, max: 60 }),
-          companyId: faker.number.int({ min: 1, max: 10 }),
-        },
-        {
-          name: "Bulk " + faker.person.fullName(),
-          email: faker.internet.email(),
-          age: faker.number.int({ min: 18, max: 60 }),
-        },
-        {
-          name: "Bulk " + faker.person.fullName(),
-          email: faker.internet.email(),
-          age: faker.number.int({ min: 18, max: 60 }),
-          companyId: faker.number.int({ min: 1, max: 10 }),
-        }
-      ], profile as any);
-      console.log("Created Users:", JSON.stringify(newUsers, null, 2));
-    } catch (err: any) {
-      console.error(`Error creating users with profile ${JSON.stringify(profile)}:`, err.message);
-    }
-  }
+  // console.log("\n=== Bulk createMany ===");
+  // for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
+  //   try {
+  //     const newUsers = await userRepo.createMany(
+  //       [
+  //         {
+  //           name: "Bulk " + faker.person.fullName(),
+  //           email: faker.internet.email(),
+  //           age: faker.number.int({ min: 18, max: 60 }),
+  //           companyId: faker.number.int({ min: 1, max: 10 }),
+  //         },
+  //         {
+  //           name: "Bulk " + faker.person.fullName(),
+  //           email: faker.internet.email(),
+  //           age: faker.number.int({ min: 18, max: 60 }),
+  //         },
+  //         {
+  //           name: "Bulk " + faker.person.fullName(),
+  //           email: faker.internet.email(),
+  //           age: faker.number.int({ min: 18, max: 60 }),
+  //           companyId: faker.number.int({ min: 1, max: 10 }),
+  //         },
+  //       ],
+  //       profile as any,
+  //     );
+  //     console.log("Created Users:", JSON.stringify(newUsers, null, 2));
+  //   } catch (err: any) {
+  //     console.error(
+  //       `Error creating users with profile ${JSON.stringify(profile)}:`,
+  //       err.message,
+  //     );
+  //   }
+  // }
 }
