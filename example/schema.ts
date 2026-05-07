@@ -7,7 +7,22 @@ export const usersTable = sqliteTable("users", {
   age: int("age"),
   tags: text({ mode: 'json' }).$type<string[]>(),
   persona: text({ mode: 'json' }).$type<{ hobbies: string[]; skills: string[] }>(),
-  
+  settings: text({ mode: 'json' }).$type<{ 
+    theme: string; 
+    notifications: boolean;
+    occasionally: {
+      randomValue: number;
+      oldValue: string;
+    },
+  }>(),
+  occupational: text({ mode: 'json' }).$type<{
+    company: string;
+    position: string;
+    period: {
+      start: Date;
+      end: Date;
+    };
+  }>(),
   companyId: int("company_id").references(() => companiesTable.id),
 
   createdAt: int("created_at").$default(() => Date.now()),

@@ -1,5 +1,5 @@
 import type { InferEntity, FindTable } from "./helper";
-import type { FlattenPaths, DeepPick, SearchQuery, FilterQuery } from "./query";
+import type { FlattenPaths, DeepPick, SearchQuery, FilterQuery, UpdateSet } from "./query";
 import type { AnyDatabase, AnyTable } from "./schema-metadata";
 import type { InferInsert } from "./value";
 
@@ -97,12 +97,12 @@ export type Repository<
 
   updateOne: (
     id: string | number,
-    set: Partial<TInsert>,
+    set: UpdateSet<NonNullable<TInsert>>,
     profile?: TProfileNames | TProfileNames[],
   ) => Promise<TEntity | null>;
   updateMany: (
     filter: FilterQuery<TEntity>,
-    set: Partial<TInsert>,
+    set: UpdateSet<NonNullable<TInsert>>,
     profile?: TProfileNames | TProfileNames[],
   ) => Promise<TEntity[]>;
 

@@ -210,69 +210,69 @@ async function main(db: any, args?: string[]) {
 
   const userRepo = schemaMetadata.repoFactory("users", {});
   const commentRepo = schemaMetadata.repoFactory("comments", {});
-  for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
-    try {
-      const users = await userRepo.searchPage(
-        {
-          filter: {
-            $or: [
-              // { email: { $like: "Cierra_Hackett%" } },
-              // { "posts.title": { $like: "%sunt aut facere%" } },
-              // { tags: { $in: ["tag1"] } },
-              // { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
-            ],
-          },
-          order: {
-            name: {
-              direction: "asc",
-              nulls: "last",
-            },
-            age: {
-              direction: "desc",
-              nulls: "last",
-              aggregate: "max",
-            },
-            "profile.bio": {
-              direction: "asc",
-              aggregate: "min",
-            },
-            persona: "desc",
-          },
-          projection: [
-            "id",
-            "name",
-            "tags",
-            "email",
-            "persona.hobbies",
-            "company.name",
-            "profile.bio",
-          ],
-        },
-        profile as any,
-      );
-      console.log(
-        `Users fetched successfully with profile ${JSON.stringify(profile)}`,
-        users,
-      );
-    } catch (e: any) {
-      console.log(
-        `Error fetching users with profile ${JSON.stringify(profile)}: ${e.message}`,
-      );
-    }
-  }
+  // for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
+  //   try {
+  //     const users = await userRepo.searchPage(
+  //       {
+  //         filter: {
+  //           $or: [
+  //             // { email: { $like: "Cierra_Hackett%" } },
+  //             // { "posts.title": { $like: "%sunt aut facere%" } },
+  //             // { tags: { $in: ["tag1"] } },
+  //             // { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
+  //           ],
+  //         },
+  //         order: {
+  //           name: {
+  //             direction: "asc",
+  //             nulls: "last",
+  //           },
+  //           age: {
+  //             direction: "desc",
+  //             nulls: "last",
+  //             aggregate: "max",
+  //           },
+  //           "profile.bio": {
+  //             direction: "asc",
+  //             aggregate: "min",
+  //           },
+  //           persona: "desc",
+  //         },
+  //         projection: [
+  //           "id",
+  //           "name",
+  //           "tags",
+  //           "email",
+  //           "persona.hobbies",
+  //           "company.name",
+  //           "profile.bio",
+  //         ],
+  //       },
+  //       profile as any,
+  //     );
+  //     console.log(
+  //       `Users fetched successfully with profile ${JSON.stringify(profile)}`,
+  //       users,
+  //     );
+  //   } catch (e: any) {
+  //     console.log(
+  //       `Error fetching users with profile ${JSON.stringify(profile)}: ${e.message}`,
+  //     );
+  //   }
+  // }
 
-  const comments = await commentRepo.searchMany({
-    filter: {},
-    projection: [
-      "id",
-      "content",
-      "postId",
-      "post.user.name",
-      "post.title",
-      "post.user.persona.hobbies",
-    ],
-  });
-  console.log("Comments:", JSON.stringify(comments[0], null, 2));
+  // const comments = await commentRepo.searchMany({
+  //   filter: {},
+  //   projection: [
+  //     "id",
+  //     "content",
+  //     "postId",
+  //     "post.user.name",
+  //     "post.title",
+  //     "post.user.persona.hobbies",
+  //   ],
+  // });
+  // console.log("Comments:", JSON.stringify(comments[0], null, 2));
 
   // console.log("\n=== Testing createOne ===");
   // for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
@@ -333,9 +333,27 @@ async function main(db: any, args?: string[]) {
 
   console.log("\n=== Testing updateOne ===");
   try {
-    const updatedUser = await userRepo.updateOne(1, {
+    const updatedUser = await userRepo.updateOne(193, {
       name: "Updated User Name",
       age: 99,
+      "persona.hobbies": ["swimming", "coding", faker.music.genre()],
+      "persona.skills.0": 'nagoya',
+      "settings.occasionally.oldValue": "new value: " + faker.lorem.sentence(),
+      "settings.occasionally.randomValue": faker.number.int(),
+      "settings.theme": "dark",
+      "settings.notifications": false,
+      // "occupational": {
+      //   company: "Updated Company",
+      //   position: "Updated Position",
+      //   period: {
+      //     start: new Date("2020-01-01"),
+      //     end: new Date("2024-01-01"),
+      //   },
+      // },
+      "occupational.company": faker.company.name(),
+      "occupational.position": faker.person.jobTitle(),
+      "occupational.period.start": new Date("2020-01-01"),
+      "occupational.period.end": faker.date.future(),
     }, "admin");
     console.log("Updated User:", JSON.stringify(updatedUser, null, 2));
   } catch (err: any) {

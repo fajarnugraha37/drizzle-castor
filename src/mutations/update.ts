@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import { buildSearchQueries, hydrateResults, type TranslatorContext } from "../query-parser";
+import { buildSearchQueries, hydrateResults, parseUpdateSet, type TranslatorContext } from "../query-parser";
 import type { DbAction } from "../types";
 import { getPrimaryKeyColumnName } from "./create";
 
@@ -23,11 +23,12 @@ export async function executeUpdateOne(
   }
 
   const pkColumn = baseTable[pkName];
+  const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
 
   // Execute update
   const updateResult = await db
     .update(baseTable)
-    .set(setParams)
+    .set(parsedSetParams)
     .where(eq(pkColumn, id))
     .returning();
 
@@ -88,10 +89,12 @@ export async function executeUpdateMany(
     return []; // Nothing to update
   }
 
+  const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
+
   // Step 2: Execute batch update
   const updateResult = await db
     .update(baseTable)
-    .set(setParams)
+    .set(parsedSetParams)
     .where(inArray(pkColumn, affectedIds))
     .returning();
 

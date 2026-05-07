@@ -31,15 +31,16 @@ export type FlattenPaths<T, Prefix extends string = ""> = {
     ? IsObject<U> extends true
       ?
           | `${Prefix}${K & string}`
+          | `${Prefix}${K & string}.${number}`
           | FlattenPaths<NonNullable<U>, `${Prefix}${K & string}.`>
-      : `${Prefix}${K & string}`
+          | FlattenPaths<NonNullable<U>, `${Prefix}${K & string}.${number}.`>
+      : `${Prefix}${K & string}` | `${Prefix}${K & string}.${number}`
     : IsObject<T[K]> extends true
       ?
           | `${Prefix}${K & string}`
           | FlattenPaths<NonNullable<T[K]>, `${Prefix}${K & string}.`>
       : `${Prefix}${K & string}`;
-}[keyof T];
-export type Field<T> = FlattenPaths<T>;
+}[keyof T];export type Field<T> = FlattenPaths<T>;
 export type FieldValue<T, P extends Field<T>> = ValueAt<T, P>;
 
 /**
@@ -47,17 +48,23 @@ export type FieldValue<T, P extends Field<T>> = ValueAt<T, P>;
  */
 export type ValueAt<T, P extends string> = P extends `${infer K}.${infer R}`
   ? K extends keyof T
-    ? T[K] extends ReadonlyArray<infer U>
+    ? NonNullable<T[K]> extends ReadonlyArray<infer U>
       ? IsObject<U> extends true
-        ? ValueAt<U, R>
-        : never
-      : IsObject<T[K]> extends true
-        ? ValueAt<T[K], R>
+        ? R extends `${number}.${infer Rest}` 
+          ? ValueAt<NonNullable<U>, Rest> 
+          : ValueAt<NonNullable<U>, R>
+        : R extends `${number}` 
+          ? U 
+          : never
+      : IsObject<NonNullable<T[K]>> extends true
+        ? ValueAt<NonNullable<T[K]>, R>
         : never
     : never
   : P extends keyof T
     ? T[P]
-    : never;
+    : P extends `${number}`
+      ? NonNullable<T> extends ReadonlyArray<infer U> ? U : never
+      : never;
 
 /**
  * Extract the "leaf" type from a field (unwrap array to get element type)
@@ -217,8 +224,12 @@ export type SearchQuery<T> = {
   pageSize?: number;
 };
 
+export type UpdateSet<T> = {
+  [K in FlattenPaths<T>]?: ValueAt<T, K>;
+};
+
 export type UpdateQuery<T, U> = {
-  set: Partial<T>;
+  set: UpdateSet<T>;
   filter: FilterQuery<U>;
 };
 

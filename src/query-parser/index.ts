@@ -4,6 +4,7 @@ export * from "./operator-builder";
 export * from "./alias-manager";
 export * from "./ast-compiler";
 export * from "./hydrator";
+export * from "./json-resolver";
 
 import { sql, getTableName } from "drizzle-orm";
 import { analyzeQuery } from "./analyzer";
