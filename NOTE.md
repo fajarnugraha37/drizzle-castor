@@ -1,6 +1,6 @@
 # Notes: TypeScript
 
-This `library relies heavily on advanced features of the TypeScript Type System. Static type manipulation is used to achieve Extreme Type Safety and Inference on database relations (Relational API) and JSON types (NoSQL-like filtering).
+This library relies heavily on advanced features of the TypeScript Type System. Static type manipulation is used to achieve Extreme Type Safety and Inference on database relations (Relational API) and JSON types (NoSQL-like filtering).
 
 Here are some critical guidelines, notes, and warnings to keep in mind when modifying or extending the core engine of this system:
 
