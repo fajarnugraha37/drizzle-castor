@@ -62,7 +62,7 @@ export function buildSearchQueries<T>(
     cteAliasMap,
   );
 
-  const filterAst = parseFilter(query.filter, baseTable, cteAliasMap);
+  const filterAst = parseFilter(query.filter, baseTable, cteAliasMap, metadata, baseTableName, db);
   if (filterAst) {
     cteQb = cteQb.where(filterAst);
   }
@@ -76,7 +76,7 @@ export function buildSearchQueries<T>(
     cteQb = cteQb.groupBy((baseTable as any).id);
   }
 
-  const orderAst = parseOrder(query.order, baseTable, cteAliasMap);
+  const orderAst = parseOrder(query.order, baseTable, cteAliasMap, metadata, baseTableName, db);
   if (orderAst.length > 0) {
     cteQb = cteQb.orderBy(...orderAst);
   }
@@ -108,7 +108,7 @@ export function buildSearchQueries<T>(
   // 5. Build True CTE and Main Query
   const sq = db.$with('sq').as(cteQb);
   
-  const selectionObj = buildSelection(query.projection as string[], baseTableName, baseTable, outerAliasMap);
+  const selectionObj = buildSelection(query.projection as string[], baseTableName, baseTable, outerAliasMap, metadata, db);
   let mainQb = selectionObj 
     ? db.with(sq).select(selectionObj).from(baseTable).innerJoin(sq, sql`${(baseTable as any).id} = ${sq}.id`)
     : db.with(sq).select().from(baseTable).innerJoin(sq, sql`${(baseTable as any).id} = ${sq}.id`);

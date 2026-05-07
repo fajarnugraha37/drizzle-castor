@@ -1,9 +1,11 @@
 import { SQL, eq, asc, desc, sql, getTableColumns, aliasedTable, getTableName } from "drizzle-orm";
+import type { AnyTable } from "drizzle-orm";
 import { getColumn } from "./alias-manager";
 import type { AliasMap } from "./alias-manager";
-import { resolveRelationPath } from "./metadata-explorer";
+import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
 import { min, max } from "drizzle-orm"; // Note: min/max imports may vary by dialect, sql`` is safer
+import { buildJsonExtractionSql } from "./json-resolver";
 
 /**
  * Builds a specific selection object for Drizzle to only select requested columns.
@@ -12,8 +14,10 @@ import { min, max } from "drizzle-orm"; // Note: min/max imports may vary by dia
 export function buildSelection(
   projection: string[] | undefined,
   baseTableName: string,
-  baseTable: AnyTable,
+  baseTable: any,
   aliasMap: AliasMap,
+  metadata: any,
+  db: any,
 ): any {
   if (!projection || projection.length === 0) return undefined;
 
@@ -25,25 +29,43 @@ export function buildSelection(
   };
 
   for (const path of projection) {
-    const lastDotIndex = path.lastIndexOf(".");
-    if (lastDotIndex === -1) {
-      selection[baseTableName][path] = (baseTable as any)[path];
-    } else {
-      const relPath = path.substring(0, lastDotIndex);
-      const colName = path.substring(lastDotIndex + 1);
-      const aliasName = `rel_${relPath.replace(/\./g, "_")}`;
+    const resolution = resolvePathSegments(metadata, baseTableName, path);
+    const relPath = resolution.relationPath;
+
+    let targetTable: any = baseTable;
+    let aliasName = baseTableName;
+
+    if (relPath) {
+      aliasName = `rel_${relPath.replace(/\./g, "_")}`;
+      targetTable = aliasMap.get(relPath);
 
       if (!selection[aliasName]) {
         selection[aliasName] = {};
-        const aliasedTable = aliasMap.get(relPath);
-        if (aliasedTable && (aliasedTable as any).id) {
-          selection[aliasName]["id"] = (aliasedTable as any).id; // Always include relation ID for hydration
+        if (targetTable && targetTable.id) {
+          selection[aliasName]["id"] = targetTable.id; // Always include relation ID for hydration
         }
       }
+    } else {
+      if (!selection[baseTableName]) {
+        selection[baseTableName] = {};
+      }
+    }
 
-      const aliasedTable = aliasMap.get(relPath);
-      if (aliasedTable) {
-        selection[aliasName][colName] = (aliasedTable as any)[colName];
+    if (targetTable && resolution.jsonPath) {
+      const jsonParts = resolution.jsonPath.split(".");
+      const columnName = jsonParts[0]!;
+      const rawColumn = targetTable[columnName];
+
+      if (rawColumn) {
+        if (jsonParts.length > 1) {
+          // JSON nested property extraction via SQL
+          const jsonRoute = jsonParts.slice(1).join(".");
+          // Crucial: assign to the exact string path requested so hydrator can pick it up
+          selection[aliasName][resolution.jsonPath] = buildJsonExtractionSql(db, rawColumn, jsonRoute);
+        } else {
+          // Normal physical column
+          selection[aliasName][columnName] = rawColumn;
+        }
       }
     }
   }
@@ -53,10 +75,10 @@ export function buildSelection(
 export function applyJoins(
   qb: any, // The Drizzle query builder instance
   paths: Set<string>,
-  tables: readonly AnyTable[],
+  tables: readonly any[],
   metadata: any,
   baseTableName: string,
-  baseTable: AnyTable,
+  baseTable: any,
   aliasMap: AliasMap,
 ) {
   // Sort paths by depth so parents are joined before children
@@ -131,8 +153,11 @@ export function applyJoins(
  */
 export function parseFilter(
   filter: any,
-  baseTable: AnyTable,
+  baseTable: any,
   aliasMap: AliasMap,
+  metadata: any,
+  baseTableName: string,
+  db: AnyDatabase,
 ): SQL | undefined {
   if (!filter || typeof filter !== "object") return undefined;
 
@@ -142,16 +167,16 @@ export function parseFilter(
     if (key === "$and" || key === "$or" || key === "$not") {
       if (Array.isArray(value)) {
         const subConditions = value.map((v) =>
-          parseFilter(v, baseTable, aliasMap),
+          parseFilter(v, baseTable, aliasMap, metadata, baseTableName, db),
         );
         conditions.push(buildConjunction(key as any, subConditions));
       } else if (key === "$not") {
-        const subCond = parseFilter(value, baseTable, aliasMap);
+        const subCond = parseFilter(value, baseTable, aliasMap, metadata, baseTableName, db);
         if (subCond) conditions.push(buildConjunction("$not", [subCond]));
       }
     } else if (!key.startsWith("$")) {
       // It's a field path
-      const col = getColumn(key, baseTable, aliasMap);
+      const col = getColumn(key, baseTable, aliasMap, metadata, baseTableName, db);
       if (col && typeof value === "object" && value !== null) {
         for (const [op, opValue] of Object.entries(value as object)) {
           conditions.push(buildFieldOperator(col, op, opValue));
@@ -169,15 +194,18 @@ export function parseFilter(
  */
 export function parseOrder(
   order: any,
-  baseTable: AnyTable,
+  baseTable: any,
   aliasMap: AliasMap,
+  metadata: any,
+  baseTableName: string,
+  db: AnyDatabase,
 ): SQL[] {
   if (!order || typeof order !== "object") return [];
 
   const clauses: SQL[] = [];
 
   for (const [key, config] of Object.entries(order)) {
-    const col = getColumn(key, baseTable, aliasMap);
+    const col = getColumn(key, baseTable, aliasMap, metadata, baseTableName, db);
     if (!col) continue;
 
     let dir = "asc";

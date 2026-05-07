@@ -13,13 +13,13 @@ declare global {
 
   export type ArrayElement<T> = T extends ReadonlyArray<infer U> ? U : never;
 
-  export type IsObject<T> = T extends Primitive
+  export type IsObject<T> = NonNullable<T> extends Primitive
     ? false
-    : T extends ReadonlyArray<infer U>
-      ? U extends Primitive
+    : NonNullable<T> extends ReadonlyArray<infer U>
+      ? NonNullable<U> extends Primitive
         ? false
         : true
-      : T extends object
+      : NonNullable<T> extends object
         ? true
         : false;
 
@@ -29,14 +29,14 @@ declare global {
    * Handles arrays: if array contains objects, traverse into them; otherwise treat as leaf
    */
   export type FlattenPaths<T, Prefix extends string = ""> = {
-    [K in keyof T]-?: T[K] extends ReadonlyArray<infer U>
+    [K in keyof T]-?: NonNullable<T[K]> extends ReadonlyArray<infer U>
       ? IsObject<U> extends true
-        ? `${Prefix}${K & string}` | FlattenPaths<U, `${Prefix}${K & string}.`>
+        ? `${Prefix}${K & string}` | FlattenPaths<NonNullable<U>, `${Prefix}${K & string}.`>
         : `${Prefix}${K & string}`
       : IsObject<T[K]> extends true
         ?
             | `${Prefix}${K & string}`
-            | FlattenPaths<T[K], `${Prefix}${K & string}.`>
+            | FlattenPaths<NonNullable<T[K]>, `${Prefix}${K & string}.`>
         : `${Prefix}${K & string}`;
   }[keyof T];
   export type Field<T> = FlattenPaths<T>;
@@ -62,7 +62,7 @@ declare global {
   /**
    * Extract the "leaf" type from a field (unwrap array to get element type)
    */
-  export type LeafType<T> = T extends ReadonlyArray<infer U> ? U : T;
+  export type LeafType<T> = NonNullable<T> extends ReadonlyArray<infer U> ? NonNullable<U> : NonNullable<T>;
 
   /**
    * OPERATORS DEFINITION

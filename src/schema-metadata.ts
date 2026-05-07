@@ -1,4 +1,12 @@
 import { buildSearchQueries, hydrateResults } from "./query-parser";
+// import type { 
+//   TStrictSchemaMetadata, 
+//   TSchemaContext, 
+//   TableConfig, 
+//   RepoProfileConfig, 
+//   Repository, 
+//   DbAction 
+// } from "./types/schema-metadata.d";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,

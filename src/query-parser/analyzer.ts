@@ -1,4 +1,4 @@
-import { resolveRelationPath } from "./metadata-explorer";
+import { resolvePathSegments } from "./metadata-explorer";
 
 export type QueryPaths = {
   ctePaths: Set<string>;
@@ -7,16 +7,16 @@ export type QueryPaths = {
 };
 
 /**
- * Extracts the relation path from a full column path.
- * e.g., "posts.comments.date" -> "posts.comments"
- * "name" -> null (base table column)
+ * Extracts the relation path from a full column path by validating against metadata.
+ * Returns null if the path does not traverse any table relations.
  */
-export function getRelationPath(fullPath: string): string | null {
-  const lastDotIndex = fullPath.lastIndexOf(".");
-  if (lastDotIndex === -1) {
-    return null; // It's a base table column
-  }
-  return fullPath.substring(0, lastDotIndex);
+export function getRelationPath(
+  fullPath: string,
+  metadata: any,
+  baseTableName: string
+): string | null {
+  const resolution = resolvePathSegments(metadata, baseTableName, fullPath);
+  return resolution.relationPath === "" ? null : resolution.relationPath;
 }
 
 /**
@@ -24,7 +24,7 @@ export function getRelationPath(fullPath: string): string | null {
  * Applies Rule A (Inner/CTE Joins) and Rule B (Outer Joins).
  */
 export function analyzeQuery<T>(
-  query: SearchQuery<T>,
+  query: any,
   metadata: any,
   baseTableName: string,
 ): QueryPaths {
@@ -34,22 +34,19 @@ export function analyzeQuery<T>(
 
   // 1. Analyze Filter (Rule A: must be inside CTE)
   if (query.filter) {
-    extractFilterPaths(query.filter, ctePaths);
+    extractFilterPaths(query.filter, ctePaths, metadata, baseTableName);
   }
 
   // 2. Analyze Order (Rule A: must be inside CTE)
   if (query.order) {
-    extractOrderPaths(query.order, ctePaths, (fullPath, config) => {
+    extractOrderPaths(query.order, ctePaths, metadata, baseTableName, (fullPath, config) => {
       if (config && typeof config === "object" && "aggregate" in config) {
         needsGroupBy = true;
       } else {
-        const relPath = getRelationPath(fullPath);
-        if (relPath) {
-          const nodes = resolveRelationPath(metadata, baseTableName, relPath);
-          const hasArrayRelation = nodes.some((n) => n.isArray);
-          if (hasArrayRelation) {
-            needsGroupBy = true;
-          }
+        const resolution = resolvePathSegments(metadata, baseTableName, fullPath);
+        const hasArrayRelation = resolution.nodes.some((n) => n.isArray);
+        if (hasArrayRelation) {
+          needsGroupBy = true;
         }
       }
     });
@@ -58,9 +55,8 @@ export function analyzeQuery<T>(
   // 3. Analyze Projection (Rule B: outer joins for hydration)
   if (query.projection && Array.isArray(query.projection)) {
     for (const path of query.projection) {
-      const relPath = getRelationPath(path as string);
-      // We must add it to outer paths to hydrate the data, even if it was used in CTE
-      // because CTE only returns the base table ID.
+      const resolution = resolvePathSegments(metadata, baseTableName, path as string);
+      const relPath = resolution.relationPath;
       if (relPath) {
         outerPaths.add(relPath);
       }
@@ -70,20 +66,25 @@ export function analyzeQuery<T>(
   return { ctePaths, outerPaths, needsGroupBy };
 }
 
-function extractFilterPaths(filter: any, paths: Set<string>) {
+function extractFilterPaths(
+  filter: any, 
+  paths: Set<string>,
+  metadata: any,
+  baseTableName: string
+) {
   if (!filter || typeof filter !== "object") return;
 
   for (const [key, value] of Object.entries(filter)) {
     if (key === "$and" || key === "$or") {
       if (Array.isArray(value)) {
         for (const item of value) {
-          extractFilterPaths(item, paths);
+          extractFilterPaths(item, paths, metadata, baseTableName);
         }
       }
     } else if (key === "$not") {
-      extractFilterPaths(value, paths);
+      extractFilterPaths(value, paths, metadata, baseTableName);
     } else if (!key.startsWith("$")) {
-      const relationPath = getRelationPath(key);
+      const relationPath = getRelationPath(key, metadata, baseTableName);
       if (relationPath) {
         paths.add(relationPath);
       }
@@ -94,12 +95,14 @@ function extractFilterPaths(filter: any, paths: Set<string>) {
 function extractOrderPaths(
   order: any,
   paths: Set<string>,
+  metadata: any,
+  baseTableName: string,
   onField: (fullPath: string, config: any) => void,
 ) {
   if (!order || typeof order !== "object") return;
 
   for (const [key, value] of Object.entries(order)) {
-    const relationPath = getRelationPath(key);
+    const relationPath = getRelationPath(key, metadata, baseTableName);
     if (relationPath) {
       paths.add(relationPath);
     }

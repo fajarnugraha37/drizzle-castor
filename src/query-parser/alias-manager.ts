@@ -1,6 +1,7 @@
 import { aliasedTable, getTableName } from "drizzle-orm";
-import { resolveRelationPath } from "./metadata-explorer";
-import type { RelationNode } from "./metadata-explorer";
+import type { SQL } from "drizzle-orm";
+import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
+import { buildJsonExtractionSql } from "./json-resolver";
 
 export type AliasMap = Map<string, AnyTable>;
 
@@ -25,7 +26,8 @@ export function buildAliases(
 ): AliasMap {
   const aliasMap: AliasMap = new Map();
 
-  for (const path of paths) {
+  const pathsArray = Array.from(paths);
+  for (const path of pathsArray) {
     const nodes = resolveRelationPath(metadata, baseTableName, path);
     // Determine the final table in the path
     const lastNode = nodes[nodes.length - 1];
@@ -46,26 +48,46 @@ export function buildAliases(
 }
 
 /**
- * Helper to safely extract a column from an aliased table (or base table).
+ * Safely extracts a column from an aliased table (or base table).
+ * If the path includes a JSON route, it generates a dialect-specific JSON extraction SQL snippet.
  */
 export function getColumn(
-  path: string, // full path, e.g., "posts.comments.date" or "name"
+  path: string, // full path, e.g., "posts.comments.date" or "persona.hobbies"
   baseTable: AnyTable,
   aliasMap: AliasMap,
+  metadata: any,
+  baseTableName: string,
+  db: any,
 ): any {
-  const lastDotIndex = path.lastIndexOf(".");
-  if (lastDotIndex === -1) {
-    // It's a base table column
-    return (baseTable as any)[path];
+  const resolution = resolvePathSegments(metadata, baseTableName, path);
+  
+  let targetTable: any = baseTable;
+  if (resolution.relationPath) {
+    targetTable = aliasMap.get(resolution.relationPath);
+    if (!targetTable) {
+      throw new Error(`Alias not found for relation path '${resolution.relationPath}'. Make sure it was added to the CTE or Outer paths.`);
+    }
   }
 
-  const relationPath = path.substring(0, lastDotIndex);
-  const columnName = path.substring(lastDotIndex + 1);
+  if (resolution.jsonPath) {
+    // The first segment of jsonPath is the actual physical column name in the table
+    const jsonParts = resolution.jsonPath.split(".");
+    const columnName = jsonParts[0]!;
+    const rawColumn = targetTable[columnName];
 
-  const aliased = aliasMap.get(relationPath);
-  if (!aliased) {
-    throw new Error(`Alias not found for relation path '${relationPath}'. Make sure it was added to the CTE or Outer paths.`);
+    if (!rawColumn) {
+      throw new Error(`Column '${columnName}' not found on table '${getTableName(targetTable)}'`);
+    }
+
+    if (jsonParts.length > 1) {
+      // It's a nested JSON path
+      const jsonRoute = jsonParts.slice(1).join(".");
+      return buildJsonExtractionSql(db, rawColumn, jsonRoute);
+    } else {
+      // It's just the column itself
+      return rawColumn;
+    }
   }
 
-  return (aliased as any)[columnName];
+  return undefined;
 }

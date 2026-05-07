@@ -52,29 +52,64 @@ export function findRelationDefinition(
   return null;
 }
 
+export function isRelation(metadata: any, tableName: string, relationName: string): boolean {
+  return findRelationDefinition(metadata, tableName, relationName) !== null;
+}
+
+export type PathResolution = {
+  nodes: RelationNode[];
+  jsonPath?: string;
+  relationPath: string; // The joined relation path
+};
+
 /**
- * Resolves a full dot-notation path (e.g., "posts.comments") into an array of RelationNodes.
- * Validates that each segment of the path actually exists in the schema metadata.
+ * Resolves a full dot-notation path (e.g., "posts.persona.hobbies") into an array of RelationNodes
+ * and extracts the remaining JSON path if it hits a column instead of a relation.
+ */
+export function resolvePathSegments(
+  metadata: any,
+  baseTableName: string,
+  path: string,
+): PathResolution {
+  const parts = path.split(".");
+  const nodes: RelationNode[] = [];
+  let currentTable = baseTableName;
+  let jsonPathSegments: string[] = [];
+  let relationPathSegments: string[] = [];
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!;
+    const node = findRelationDefinition(metadata, currentTable, part);
+    
+    if (!node) {
+      // If not a relation, the rest of the path belongs to a JSON column
+      jsonPathSegments = parts.slice(i);
+      break;
+    }
+    
+    nodes.push(node);
+    relationPathSegments.push(part);
+    currentTable = node.relatedTable;
+  }
+
+  return {
+    nodes,
+    jsonPath: jsonPathSegments.length > 0 ? jsonPathSegments.join(".") : undefined,
+    relationPath: relationPathSegments.join(".")
+  };
+}
+
+/**
+ * Backward compatibility for places that expect purely relational paths.
  */
 export function resolveRelationPath(
   metadata: any,
   baseTableName: string,
   path: string,
 ): RelationNode[] {
-  const parts = path.split(".");
-  const nodes: RelationNode[] = [];
-  let currentTable = baseTableName;
-
-  for (const part of parts) {
-    const node = findRelationDefinition(metadata, currentTable, part);
-    if (!node) {
-      throw new Error(
-        `Relation '${part}' not found on table '${currentTable}'.`,
-      );
-    }
-    nodes.push(node);
-    currentTable = node.relatedTable;
+  const resolution = resolvePathSegments(metadata, baseTableName, path);
+  if (resolution.jsonPath) {
+    throw new Error(`Path '${path}' contains non-relational segment '${resolution.jsonPath.split('.')[0]}'`);
   }
-
-  return nodes;
+  return resolution.nodes;
 }

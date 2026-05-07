@@ -208,6 +208,8 @@ async function main(db: any, args?: string[]) {
             $or: [
                 { email: { $notLike: "Cierra_Hackett%" } },
                 { "posts.title": { $like: "%sunt aut facere%" } },
+                { 'tags': { $eq: "tag1" } },
+                { 'persona.hobbies': { $in: ["footbal", 'baskeet'] } },
             ],
         },
         order: {
@@ -223,16 +225,18 @@ async function main(db: any, args?: string[]) {
           "profile.bio": {
             direction: "asc",
             aggregate: 'min',
-          }
+          },
+          "persona": 'desc'
         },
         projection: [
           "id", 
           "name", 
           "tags", 
           "email", 
+          "persona.hobbies",
         ],
-      }, profile as any);
-      console.log(`Users fetched successfully with profile ${JSON.stringify(profile)}`);
+        }, profile as any);
+      console.log(`Users fetched successfully with profile ${JSON.stringify(profile)}`, users);
     } catch (e: any) {
       console.log(`Error fetching users with profile ${JSON.stringify(profile)}: ${e.message}`);
     }
@@ -240,7 +244,7 @@ async function main(db: any, args?: string[]) {
 
   const comments = await commentRepo.searchMany({
     filter: {},
-    projection: ["id", "content", "postId", "post.user.name", "post.title"],
+    projection: ["id", "content", "postId", "post.user.name", "post.title", 'post.user.persona.hobbies'],
   });
-  console.log("Comments:", comments[0]);
+  console.log("Comments:", JSON.stringify(comments[0], null, 2));
 }

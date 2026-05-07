@@ -2,6 +2,40 @@ import type { AliasMap } from "./alias-manager";
 import { resolveRelationPath } from "./metadata-explorer";
 
 /**
+ * Utility to unflatten an object with dot-notation keys.
+ * Also parses stringified JSON values (common in SQLite json_extract).
+ */
+function unflattenAndParseJson(obj: any): any {
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    let parsedValue = value;
+    if (typeof value === "string") {
+      try {
+        parsedValue = JSON.parse(value);
+      } catch (e) {
+        // Not a JSON string, keep as is
+      }
+    }
+
+    if (key.includes(".")) {
+      const parts = key.split(".");
+      let current = result;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i]!;
+        if (!current[part]) {
+          current[part] = {};
+        }
+        current = current[part];
+      }
+      current[parts[parts.length - 1]!] = parsedValue;
+    } else {
+      result[key] = parsedValue;
+    }
+  }
+  return result;
+}
+
+/**
  * Hydrates flat SQL rows from Drizzle (Core Query Builder) back into nested JSON objects.
  * Handles arrays (OneToMany) and objects (ManyToOne) by inspecting the metadata.
  *
@@ -17,20 +51,27 @@ export function hydrateResults(
   const rootMap = new Map<any, any>();
 
   for (const row of rows) {
-    const baseObj = row[baseTableName];
-    if (!baseObj) continue;
+    const rawBaseObj = row[baseTableName];
+    if (!rawBaseObj) continue;
 
+    const baseObj = unflattenAndParseJson(rawBaseObj);
     const rootId = baseObj[primaryKeyField];
+    
     if (!rootMap.has(rootId)) {
       rootMap.set(rootId, { ...baseObj });
+    } else {
+      // Merge in case JSON properties are split across rows, though unlikely for base table
+      Object.assign(rootMap.get(rootId), baseObj);
     }
 
     const rootEntity = rootMap.get(rootId);
 
     // Process relations in the current row
-    for (const [alias, data] of Object.entries(row)) {
+    for (const [alias, rawData] of Object.entries(row)) {
       // Ignore base table, internal CTE alias (sq), or null/empty joined rows
-      if (alias === baseTableName || alias === "sq" || !data) continue;
+      if (alias === baseTableName || alias === "sq" || !rawData) continue;
+
+      const data = unflattenAndParseJson(rawData);
 
       // Extract original path from alias (e.g., "rel_posts_comments" -> "posts.comments")
       // Warning: this simple replace might have edge cases if relation names have underscores.
