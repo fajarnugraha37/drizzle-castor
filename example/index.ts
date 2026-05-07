@@ -371,4 +371,22 @@ async function main(db: any, args?: string[]) {
   } catch (err: any) {
     console.error("Error bulk updating users:", err.message);
   }
+
+  console.log("\n=== Testing hardDeleteOne ===");
+  try {
+    const isDeleted = await userRepo.hardDeleteOne(193, "admin");
+    console.log("Hard Deleted User 193:", isDeleted);
+  } catch (err: any) {
+    console.error("Error hard deleting user:", err.message);
+  }
+
+  console.log("\n=== Testing hardDeleteMany ===");
+  try {
+    const deletedCount = await userRepo.hardDeleteMany({
+      email: { $like: "Cierra_Hackett%" }
+    } as any, "admin");
+    console.log("Hard Deleted Many Users Count:", deletedCount);
+  } catch (err: any) {
+    console.error("Error bulk hard deleting users:", err.message);
+  }
 }

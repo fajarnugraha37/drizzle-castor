@@ -1,6 +1,7 @@
 import { executeCreateOne, executeCreateMany } from "./mutations/create";
 import { executeUpdateOne, executeUpdateMany } from "./mutations/update";
 import { executeSearchOne, executeSearchPage, executeSearchMany } from "./queries/search";
+import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete";
 import { getTableName } from "drizzle-orm";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
 
@@ -181,17 +182,16 @@ export function defineSchemaMetadata<
           throw new Error("Not implemented");
         },
         hardDeleteOne: async (id, profile) => {
-          checkAccess("hardDelete", profile as any);
-          console.log(`Executing hardDeleteOne on ${tableName} with id: ${id}`);
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeHardDeleteOne(id, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         hardDeleteMany: async (filter, profile) => {
-          checkAccess("hardDelete", profile as any);
-          console.log(
-            `Executing hardDeleteMany on ${tableName} with filter:`,
-            filter,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeHardDeleteMany(filter, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
       };
     };
