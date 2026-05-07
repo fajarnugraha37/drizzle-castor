@@ -31,7 +31,7 @@ const schemaMetadata = defineSchemaMetadata(db, [
   }
 });
 
-const userRepo = schemaMetadata.repoFactory('books', {
+const userRepo = schemaMetadata.repoFactory('users', {
     'asdasd': {
     },
     'asdasd2': {
@@ -46,4 +46,24 @@ const userRepo = schemaMetadata.repoFactory('books', {
     //     'allowedSorts': ['id', 'name'],
     //     'allowedProjections': ['id', 'name'],
     // }
+});
+
+userRepo.createOne({
+  email: "user@example.com",
+  name: "John Doe",
+  age: 30,
+  'tags': ['tag1', 'tag2'],
+  'persona': {
+    hobbies: ['hobby1', 'hobby2'],
+    skills: ['skill1', 'skill2'],
+  }
 })
+
+userRepo.searchMany({
+  filter: {
+  },
+  order: {
+    name: 'asc',
+  },
+  projection: ['id', 'name', 'tags', 'persona'],
+});
