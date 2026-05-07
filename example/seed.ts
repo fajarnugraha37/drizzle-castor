@@ -75,16 +75,18 @@ export async function seed(db: BunSQLiteDatabase, args?: string[]) {
     if (postsCount === 0) {
         for (let i = 1; i <= 100; i++) {
             const randomUser = users[Math.floor(Math.random() * users.length)];
-            await db.insert(postsTable).values({
+            const post = db.insert(postsTable).values({
                 title: faker.lorem.sentence(),
                 userId: randomUser.id,
-            });
+            })
+            .returning()
+            .get();
 
             const commentsCount = faker.number.int({ min: 1, max: 5 });
             for (let j = 1; j <= commentsCount; j++) {
                 await db.insert(commentsTable).values({
                     content: faker.lorem.sentence(),
-                    postId: i,
+                    postId: post.id,
                 });
             }
             console.log(`Inserted post ${i} with comments count: ${commentsCount}`);

@@ -76,13 +76,3 @@ export const userGroups = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.userId, t.groupId] })],
 );
-
-export const tables = [
-  usersTable,
-  postsTable,
-  commentsTable,
-  profilesTable,
-  companiesTable,
-  groupsTable,
-  userGroups,
-] as const;

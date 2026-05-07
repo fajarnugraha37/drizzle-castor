@@ -1,6 +1,8 @@
+import { buildSearchQueries, hydrateResults } from "./query-parser";
+
 export function defineSchemaMetadata<
-  const TDb extends AnyDatabase,
-  const TTables extends readonly AnyTable[],
+  TDb extends AnyDatabase,
+  TTables extends readonly AnyTable[],
 >(db: TDb, tables: TTables) {
   type _TTStrictSchemaMetadata = TStrictSchemaMetadata<
     TDb,
@@ -9,7 +11,7 @@ export function defineSchemaMetadata<
   return function <const TMetadata extends _TTStrictSchemaMetadata>(
     metadata: TMetadata,
   ) {
-    type _TSchemaContext = TSchemaContext<TDb, TTables>;
+    type _TSchemaContext = TSchemaContext<TDb, TTables, TMetadata>;
     type _TTableNames = keyof TMetadata & string;
     type _TProfileNames<TName extends _TTableNames> =
       TMetadata[TName] extends TableConfig<_TSchemaContext, TName>
@@ -28,12 +30,20 @@ export function defineSchemaMetadata<
     >;
 
     const repoFactory = <
-      const TName extends _TTableNames,
-      const TProfiles extends _TProfiles<TName>,
+      TName extends _TTableNames,
+      TProfiles extends _TProfiles<TName>,
     >(
       tableName: TName,
       options: TProfiles,
     ): Repository<_TSchemaContext, TName, TProfiles> => {
+      
+      const translatorContext = {
+        db,
+        tables,
+        metadata,
+        baseTableName: tableName,
+      };
+
       return {
         createOne: async (data, profile) => {
           console.log(`Executing createOne on ${tableName} with data:`, data);
@@ -48,18 +58,40 @@ export function defineSchemaMetadata<
           throw new Error("Not implemented");
         },
         searchPage: async (query, profile) => {
-          console.log(
-            `Executing searchPage on ${tableName} with query:`,
-            query,
-          );
-          throw new Error("Not implemented");
+          const page = query.page ?? 1;
+          const pageSize = query.pageSize ?? 10;
+          
+          const { mainQuery, countQuery } = buildSearchQueries(query as any, translatorContext, true);
+          
+          // Execute Count query
+          const countResult = await countQuery;
+          const totalItems = Number(countResult[0]?.count || 0);
+          const totalPages = Math.ceil(totalItems / pageSize);
+
+          if (totalItems === 0) {
+            return { 
+              data: [], 
+              meta: { currentPage: page, pageSize, totalPages: 0, totalItems: 0 } 
+            } as any;
+          }
+
+          // Execute Main Query (which wraps the CTE) & Hydrate
+          const rawRows = await mainQuery;
+          const data = hydrateResults(rawRows, tableName, metadata);
+
+          return { 
+            data, 
+            meta: { currentPage: page, pageSize, totalPages, totalItems } 
+          } as any;
         },
         searchMany: async (query, profile) => {
-          console.log(
-            `Executing searchMany on ${tableName} with query:`,
-            query,
-          );
-          throw new Error("Not implemented");
+          const { mainQuery } = buildSearchQueries(query as any, translatorContext, false);
+          
+          // Execute Main Query (which wraps the CTE) & Hydrate
+          const rawRows = await mainQuery;
+          const data = hydrateResults(rawRows, tableName, metadata);
+
+          return data;
         },
         searchDeletedOne: async (query, profile) => {
           console.log(

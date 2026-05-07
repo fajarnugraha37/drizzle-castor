@@ -124,6 +124,13 @@ declare global {
     allowedSorts?: readonly TEntityPaths[];
   };
 
+  type DbQueryResult<
+    TEntity,
+    Q extends { projection?: any },
+  > = Q["projection"] extends Array<string>
+    ? DeepPick<TEntity, Q["projection"][number]>
+    : TEntity;
+
   type Repository<
     TSchema extends {
       db: AnyDatabase;
@@ -143,31 +150,47 @@ declare global {
       profile?: TProfileNames,
     ) => Promise<TEntity[]>;
 
-    searchOne: (
-      query: Pick<SearchQuery<TEntity>, "projection" | "filter">,
+    searchOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">>(
+      query: Q,
       profile?: TProfileNames,
-    ) => Promise<TEntity | null>;
-    searchPage: (
-      query: SearchQuery<TEntity>,
+    ) => Promise<DbQueryResult<TEntity, Q> | null>;
+    searchPage: <Q extends SearchQuery<TEntity>>(
+      query: Q,
       profile?: TProfileNames,
-    ) => Promise<{ data: TEntity[]; total: number }>;
-    searchMany: (
-      query: Omit<SearchQuery<TEntity>, "limit" | "offset">,
+    ) => Promise<{
+      data: DbQueryResult<TEntity, Q>[];
+      meta: {
+        currentPage: number;
+        pageSize: number;
+        totalPages: number;
+        totalItems: number;
+      };
+    }>;
+    searchMany: <Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">>(
+      query: Q,
       profile?: TProfileNames,
-    ) => Promise<TEntity[]>;
+    ) => Promise<DbQueryResult<TEntity, Q>[]>;
 
-    searchDeletedOne: (
-      query: Pick<SearchQuery<TEntity>, "projection" | "filter">,
+    searchDeletedOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">>(
+      query: Q,
       profile?: TProfileNames,
-    ) => Promise<TEntity | null>;
-    searchDeletedPage: (
-      query: SearchQuery<TEntity>,
+    ) => Promise<DbQueryResult<TEntity, Q> | null>;
+    searchDeletedPage: <Q extends SearchQuery<TEntity>>(
+      query: Q,
       profile?: TProfileNames,
-    ) => Promise<{ data: TEntity[]; total: number }>;
-    searchDeletedMany: (
-      query: Omit<SearchQuery<TEntity>, "limit" | "offset">,
+    ) => Promise<{
+      data: DbQueryResult<TEntity, Q>[];
+      meta: {
+        currentPage: number;
+        pageSize: number;
+        totalPages: number;
+        totalItems: number;
+      };
+    }>;
+    searchDeletedMany: <Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">>(
+      query: Q,
       profile?: TProfileNames,
-    ) => Promise<TEntity[]>;
+    ) => Promise<DbQueryResult<TEntity, Q>[]>;
 
     updateOne: (
       id: string | number,

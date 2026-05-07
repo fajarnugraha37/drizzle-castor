@@ -54,8 +54,8 @@ declare global {
       [TRelated in TAllTables as TableName<TRelated>]: {
         relationName: string;
         relatedTable: TableName<TRelated>;
-        foreignKey: ColumnPath<TLocalTable>;
-        localKey: ColumnPath<TRelated>;
+        localKey: ColumnPath<TLocalTable>;
+        foreignKey: ColumnPath<TRelated>;
       };
     }[TableName<TAllTables>][];
     manyToMany?: readonly {
@@ -76,10 +76,11 @@ declare global {
   export type TSchemaContext<
     TDb extends AnyDatabase,
     TTables extends readonly AnyTable[],
+    TMetadata extends Record<string, any> = any
   > = {
     db: TDb;
     tables: TTables;
-    metadata: TStrictSchemaMetadata<TDb, TTables>["metadata"];
+    metadata: TMetadata;
   };
 
   export type TStrictSchemaMetadata<
@@ -94,7 +95,7 @@ declare global {
       >;
     } & {
       [TTable in TTables[number] as TableName<TTable>]?: TableConfig<
-        TSchemaContext<TDb, TTables, TStrictSchemaMetadata>,
+        TSchemaContext<TDb, TTables>,
         TableName<TTable>
       >;
     };

@@ -16,10 +16,12 @@ import {
   userGroups,
 } from "./schema";
 import { DefaultLogger, Logger } from "drizzle-orm";
+import {  } from "bun";
+
 
 {
   const command = process.argv.splice(2).join(" ");
-  const db = drizzle("./data/db.sqlite", {
+  const db = drizzle("db.sqlite", {
     // logger: true,
     logger: new DefaultLogger({
       writer: new (class implements Logger {
@@ -68,27 +70,169 @@ async function main(db: any, args?: string[]) {
     groupsTable,
     userGroups,
   ] as const)({
-    users: {},
-    comments: {},
-    companies: {},
-    groups: {},
-    posts: {},
-    profiles: {},
-    userGroups: {},
+    'users': {
+      'oneToOne': [
+        {
+          relationName: "profile",
+          relatedTable: "profiles",
+          localKey: 'users.id',
+          foreignKey: 'profiles.userId',
+        },
+        {
+          relationName: "company",
+          relatedTable: "companies",
+          localKey: 'users.companyId',
+          foreignKey: 'companies.id',
+        }
+      ],
+      'oneToMany': [
+        {
+          relationName: "posts",
+          relatedTable: "posts",
+          localKey: 'users.id',
+          foreignKey: 'posts.userId',
+        }
+      ],
+      'manyToMany': [
+        {
+          relationName: "groups",
+          joinTable: "users_to_groups",
+          localKey: 'users.id',
+          joinLocalKey: 'users_to_groups.userId',
+          relatedTable: 'groups',
+          relatedKey: 'groups.id',
+          joinRelatedKey: 'users_to_groups.groupId',
+        }
+      ],
+      hooks: {
+        'beforeSearch': async (query): Promise<void> => {
+          console.log(`Before search hook triggered for users with query:`, query);
+        },
+        'afterSearch': async (query, result): Promise<void> => {
+          console.log(`After search hook triggered for users with query:`, query);
+          console.log(`Search result:`, result);
+        }
+      }
+    },
+    profiles: {
+      oneToOne: [
+        {
+          relationName: "user",
+          relatedTable: "users",
+          localKey: 'profiles.userId',
+          foreignKey: 'users.id',
+        }
+      ],
+    },
+    comments: {
+      manyToOne: [
+        {
+          'relationName': "post",
+          'relatedTable': 'posts',
+          'localKey': 'comments.postId',
+          'foreignKey': 'posts.id',
+        }
+      ],
+    },
+    companies: {
+      oneToMany: [
+        {
+          relationName: "users",
+          relatedTable: "users",
+          localKey: 'companies.id',
+          foreignKey: 'users.companyId',
+        }
+      ],
+    },
+    groups: {
+      manyToMany: [
+        {
+          relationName: "users",
+          joinTable: "users_to_groups",
+          localKey: 'groups.id',
+          joinLocalKey: 'users_to_groups.groupId',
+          relatedTable: 'users',
+          relatedKey: 'users.id',
+          joinRelatedKey: 'users_to_groups.userId',
+        }
+      ],
+    },
+    posts: {
+      manyToOne: [
+        {
+          relationName: "user",
+          relatedTable: "users",
+          localKey: 'posts.userId',
+          foreignKey: 'users.id',
+        }
+      ],
+      oneToMany: [
+        {
+          relationName: "comments",
+          relatedTable: "comments",
+          localKey: 'posts.id',
+          foreignKey: 'comments.postId',
+        }
+      ],
+    },
+    userGroups: {
+      manyToOne: [
+        {
+          relationName: "user",
+          relatedTable: "users",
+          localKey: 'userGroups.userId',
+          foreignKey: 'users.id',
+        }
+      ],
+    },
   });
-  const userRepo = schemaMetadata.repoFactory("users", {});
-  const users = await userRepo.searchMany({
+  const userRepo = schemaMetadata.repoFactory("users", {
+  });
+  const commentRepo = schemaMetadata.repoFactory("comments", {
+  });
+  const users = await userRepo.searchPage({
+    page: 1,
+    pageSize: 10,
     filter: {
         $or: [
-            { name: { $like: "%Yolanda%" } },
             { email: { $notLike: "Cierra_Hackett%" } },
+            { "posts.title": { $like: "%sunt aut facere%" } },
         ]
     },
     order: {
       name: "asc",
       age: "desc",
+      "profile.bio": {
+        direction: "asc",
+        aggregate: "min",
+      }
     },
-    projection: ["id", "name", "tags", "persona"],
+    projection: [
+      "id", 
+      "name", 
+      "tags", 
+      "email", 
+      "profile.bio",
+      "profile.avatarUrl",
+      "company.name",
+      "posts.title", 
+      "posts.comments.content",
+      "groups.name",
+    ],
   });
-  console.log("Users:", users);
+  console.log("Page:", users.meta);
+  console.log("Users:", users.data.length, users.data[0]);
+
+  const comments = await commentRepo.searchMany({
+    filter: {
+    },
+    projection: [
+      "id",
+      "content",
+      "postId",
+      "post.user.name",
+      "post.title",
+    ],
+  });
+  console.log("Comments:", comments.at(0));
 }

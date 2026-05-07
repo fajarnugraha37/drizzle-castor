@@ -72,7 +72,7 @@ declare global {
     $ne?: T;
   };
 
-  export type OrderableOps<T> = T extends string | number | Date
+  export type OrderableOps<T> = NonNullable<T> extends string | number | Date
     ? { $gt?: T; $gte?: T; $lt?: T; $lte?: T }
     : {};
 
@@ -88,7 +88,7 @@ declare global {
     $notInArray?: ReadonlyArray<T>;
   };
 
-  export type BetweenOps<T> = T extends string | number | Date
+  export type BetweenOps<T> = NonNullable<T> extends string | number | Date
     ? { $between?: readonly [T, T]; $notBetween?: readonly [T, T] }
     : {};
 
@@ -100,7 +100,7 @@ declare global {
   };
 
   export type ArrayContainmentOps<T> =
-    T extends ReadonlyArray<infer U>
+    NonNullable<T> extends ReadonlyArray<infer U>
       ? {
           $arrayContains?: ReadonlyArray<U>;
           $arrayContained?: ReadonlyArray<U>;
@@ -117,7 +117,7 @@ declare global {
     NullOps &
     InOps<LeafType<T>> &
     BetweenOps<T> &
-    (T extends string ? StringOps : {}) &
+    ([NonNullable<T>] extends [string] ? StringOps : {}) &
     ArrayContainmentOps<T>;
 
   export type Conjunctions<T> = {
@@ -151,6 +151,7 @@ declare global {
     | {
         direction?: OrderDirection; // default: 'asc'
         nulls?: NullsPosition; // optional: 'first' | 'last'
+        aggregate?: "min" | "max" | "avg" | "sum" | "count"; // optional: for array relations
       };
 
   /**
@@ -176,12 +177,30 @@ declare global {
   };
   export type OrderQueryArray<T> = OrderClause<T> | OrderClause<T>[];
 
+  /**
+   * Deeply pick properties from an object based on a union of dot-notation string paths.
+   */
+  export type DeepPick<T, P extends string> = T extends ReadonlyArray<infer U>
+    ? DeepPick<U, P>[]
+    : {
+        [K in keyof T as Extract<P, `${K & string}` | `${K & string}.${string}`> extends never
+          ? never
+          : K]: Extract<P, `${K & string}`> extends never
+          ? DeepPick<
+              NonNullable<T[K]>,
+              Extract<P, `${K & string}.${string}`> extends `${K & string}.${infer Rest}`
+                ? Rest
+                : never
+            > | Extract<T[K], null | undefined>
+          : T[K]; // If exact base key is matched, return the whole object
+      };
+
   export type SearchQuery<T> = {
     projection?: FlattenPaths<T>[];
     filter?: FilterQuery<T>;
     order?: OrderQuery<T>;
-    limit?: number;
-    offset?: number;
+    page?: number;
+    pageSize?: number;
   };
 
   export type UpdateQuery<T, U> = {
