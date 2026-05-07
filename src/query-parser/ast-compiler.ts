@@ -182,20 +182,31 @@ export function parseOrder(
 
     let dir = "asc";
     let agg: string | undefined = undefined;
+    let nullsPosition: string | undefined = undefined;
 
     if (typeof config === "string") {
       dir = config;
     } else if (typeof config === "object" && config !== null) {
       dir = (config as any).direction || "asc";
       agg = (config as any).aggregate;
+      nullsPosition = (config as any).nulls;
+    }
+
+    const sortDir = dir === "desc" ? sql`DESC` : sql`ASC`;
+    let nullsSql = sql``;
+    if (nullsPosition === "first") {
+      nullsSql = sql` NULLS FIRST`;
+    } else if (nullsPosition === "last") {
+      nullsSql = sql` NULLS LAST`;
     }
 
     if (agg) {
       // Smart Aggregation fallback: MIN for asc, MAX for desc if agg is specifically requested
       const aggFunc = agg.toUpperCase();
-      const sortDir = dir === "desc" ? sql`DESC` : sql`ASC`;
       // Use SQL template literal to force the aggregation function
-      clauses.push(sql`${sql.raw(aggFunc)}(${col}) ${sortDir}`);
+      clauses.push(sql`${sql.raw(aggFunc)}(${col}) ${sortDir}${nullsSql}`);
+    } else if (nullsPosition) {
+      clauses.push(sql`${col} ${sortDir}${nullsSql}`);
     } else {
       clauses.push(dir === "desc" ? desc(col) : asc(col));
     }
