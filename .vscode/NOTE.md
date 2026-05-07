@@ -1,0 +1,3 @@
+tolong hasil diskusi kita di tulis di ./plan/001_PLAN.md beserta implementation plan dan expected output atau hasil dari plan ini setelah selesai. Perlu diingat
+  codingannya harus memenuhi standard typescript, standard idustri, follow bestpractice, common & design pattern, modular, separation concern, DRY, JANGAN DIY (kalau mau
+  tambah library silahkan), Keep it simple & stupid dan tidak boleh ada file yang lebih dari 300 baris
