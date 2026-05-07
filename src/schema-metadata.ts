@@ -1,12 +1,13 @@
 import { buildSearchQueries, hydrateResults } from "./query-parser";
-// import type { 
-//   TStrictSchemaMetadata, 
-//   TSchemaContext, 
-//   TableConfig, 
-//   RepoProfileConfig, 
-//   Repository, 
-//   DbAction 
-// } from "./types/schema-metadata.d";
+import type { 
+  TStrictSchemaMetadata, 
+  TSchemaContext, 
+  TableConfig, 
+  RepoProfileConfig, 
+  Repository, 
+  DbAction,
+  StrictRelations
+} from "./types/schema-metadata.d";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
@@ -283,4 +284,42 @@ export function defineSchemaMetadata<
       repoFactory,
     };
   };
+}
+
+export class SchemaBuilder<
+  TDb extends AnyDatabase,
+  TTables extends readonly AnyTable[],
+  TMetadata extends Record<string, any> = {}
+> {
+  constructor(
+    private db: TDb,
+    private tables: TTables,
+    private mode: "strict" | "lenient",
+    private metadata: TMetadata = {} as TMetadata
+  ) {}
+
+  table<
+    TName extends TableName<TTables[number]>,
+    TConfig extends TableConfig<TSchemaContext<TDb, TTables, TMetadata>, TName> & 
+      StrictRelations<TTables[number], Extract<TTables[number], { _: { name: TName } }>> = TableConfig<TSchemaContext<TDb, TTables, TMetadata>, TName> & StrictRelations<TTables[number], Extract<TTables[number], { _: { name: TName } }>>
+  >(
+    tableName: TName,
+    config: TConfig
+  ): SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }> {
+    return new SchemaBuilder(this.db, this.tables, this.mode, {
+      ...this.metadata,
+      [tableName]: config,
+    } as any);
+  }
+
+  build() {
+    return defineSchemaMetadata(this.db, this.tables, this.mode)(this.metadata as any);
+  }
+}
+
+export function createSchemaBuilder<
+  TDb extends AnyDatabase,
+  TTables extends readonly AnyTable[],
+>(db: TDb, tables: TTables, mode: "strict" | "lenient" = "lenient") {
+  return new SchemaBuilder(db, tables, mode);
 }

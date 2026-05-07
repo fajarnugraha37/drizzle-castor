@@ -38,6 +38,9 @@
     "LICENSE"
   ],
   "scripts": {
+    "example:main": "bun run example/index.ts --main",
+    "example:seed": "bun run example/index.ts --seed",
+    "example:tsc": "bunx tsc example/index.ts --noEmit",
     "build": "rm -rf dist && bunx tsc && bunx tsup",
     "test": "bun test",
     "test:watch": "bun test --watch",
@@ -61,6 +64,7 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
+    "minimatch": "^10.2.5",
     "zod": "^4.4.3"
   }
 }

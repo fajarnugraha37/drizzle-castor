@@ -1,5 +1,4 @@
 import { aliasedTable, getTableName } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildJsonExtractionSql } from "./json-resolver";
 

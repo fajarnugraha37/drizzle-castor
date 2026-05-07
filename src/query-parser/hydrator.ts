@@ -1,4 +1,3 @@
-import type { AliasMap } from "./alias-manager";
 import { resolveRelationPath } from "./metadata-explorer";
 
 /**

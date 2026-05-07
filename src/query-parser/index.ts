@@ -5,7 +5,7 @@ export * from "./alias-manager";
 export * from "./ast-compiler";
 export * from "./hydrator";
 
-import { sql, inArray, getTableName } from "drizzle-orm";
+import { sql, getTableName } from "drizzle-orm";
 import { analyzeQuery } from "./analyzer";
 import { buildAliases } from "./alias-manager";
 import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compiler";

@@ -3,3 +3,4 @@
 // export * from "./types/query";
 // export * from "./types/schema-metadata";
 export * from "./schema-metadata";
+export * from "./schema-metadata-builder";

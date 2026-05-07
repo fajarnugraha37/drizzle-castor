@@ -4,7 +4,7 @@
 /// <reference path="../src/types/schema-metadata.d.ts" />
 
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { defineSchemaMetadata } from "../src/index";
+import { createSchemaBuilder, defineSchemaMetadata } from "../src/index";
 import { seed } from "./seed";
 import {
   companiesTable,
@@ -17,11 +17,11 @@ import {
 } from "./schema";
 import { DefaultLogger, Logger } from "drizzle-orm";
 import {} from "bun";
+import { getDatabaseFileLocation } from "./helper";
 
 {
   const command = process.argv.splice(2).join(" ");
-  const db = drizzle("db.sqlite", {
-    // logger: true,
+  const db = drizzle(getDatabaseFileLocation(), {
     logger: new DefaultLogger({
       writer: new (class implements Logger {
         logQuery(query: string, params: unknown[]): void {
@@ -60,7 +60,7 @@ import {} from "bun";
 }
 
 async function main(db: any, args?: string[]) {
-  const schemaMetadata = defineSchemaMetadata(db, [
+  const tables = [
     companiesTable,
     usersTable,
     profilesTable,
@@ -68,8 +68,51 @@ async function main(db: any, args?: string[]) {
     commentsTable,
     groupsTable,
     userGroups,
-  ] as const)({
+  ] as const;
+  const _ = defineSchemaMetadata(db, tables);
+  const metadata = _({
     users: {
+      oneToMany: [
+        {
+          relationName: "posts",
+          relatedTable: "posts",
+          localKey: "users.id",
+          foreignKey: "posts.userId",
+        },
+      ],
+      manyToMany: [
+        {
+          relationName: "groups",
+          joinTable: "users_to_groups",
+          localKey: "users.id",
+          joinLocalKey: "users_to_groups.userId",
+          relatedTable: "groups",
+          relatedKey: "groups.id",
+          joinRelatedKey: "users_to_groups.groupId",
+        },
+      ],
+    },
+  });
+  const repo = metadata.repoFactory("users", {});
+  const r = repo.searchOne;
+  const result = await repo.searchOne({
+    filter: {
+      $or: [
+        { email: { $like: "Cierra_Hackett%" } },
+        { "posts.title": { $like: "%sunt aut facere%" } },
+        { tags: { $in: ["tag1"] } },
+        { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
+      ],
+    },
+    'projection': [
+      'groups.name',
+      'age',
+    ]
+  });
+  console.log("Search result:", result?.age);
+
+  const schemaMetadata = createSchemaBuilder(db, tables)
+    .table("users", {
       oneToOne: [
         {
           relationName: "profile",
@@ -103,31 +146,31 @@ async function main(db: any, args?: string[]) {
           joinRelatedKey: "users_to_groups.groupId",
         },
       ],
-      profiles: {
-        default: ["read"],
-        public: [],
-        admin: [
-          "create",
-          "read",
-          "update",
-          "softDelete",
-          "restore",
-          "hardDelete",
-        ],
-      },
-      hooks: {
-        beforeSearch: async (query): Promise<void> => {
-          // console.log(`[Hooks] Before search hook triggered`);
-          // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
-        },
-        afterSearch: async (query, result): Promise<void> => {
-          // console.log(`[Hooks] After search hook triggered`);
-          // console.log(`[Hooks] After search hook triggered for users with query:`, query);
-          // console.log(`[Hooks] Search result:`, result[0].name);
-        },
-      },
-    },
-    profiles: {
+      // profiles: {
+      //   default: ["read"],
+      //   public: [],
+      //   admin: [
+      //     "create",
+      //     "read",
+      //     "update",
+      //     "softDelete",
+      //     "restore",
+      //     "hardDelete",
+      //   ],
+      // },
+      // hooks: {
+      //   beforeSearch: async (query): Promise<void> => {
+      //     // console.log(`[Hooks] Before search hook triggered`);
+      //     // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
+      //   },
+      //   afterSearch: async (query, result): Promise<void> => {
+      //     // console.log(`[Hooks] After search hook triggered`);
+      //     // console.log(`[Hooks] After search hook triggered for users with query:`, query);
+      //     // console.log(`[Hooks] Search result:`, result[0].name);
+      //   },
+      // },
+    })
+    .table("profiles", {
       oneToOne: [
         {
           relationName: "user",
@@ -136,8 +179,8 @@ async function main(db: any, args?: string[]) {
           foreignKey: "users.id",
         },
       ],
-    },
-    comments: {
+    })
+    .table("comments", {
       manyToOne: [
         {
           relationName: "post",
@@ -146,8 +189,8 @@ async function main(db: any, args?: string[]) {
           foreignKey: "posts.id",
         },
       ],
-    },
-    companies: {
+    })
+    .table("companies", {
       oneToMany: [
         {
           relationName: "users",
@@ -156,8 +199,8 @@ async function main(db: any, args?: string[]) {
           foreignKey: "users.companyId",
         },
       ],
-    },
-    groups: {
+    })
+    .table("groups", {
       manyToMany: [
         {
           relationName: "users",
@@ -169,8 +212,8 @@ async function main(db: any, args?: string[]) {
           joinRelatedKey: "users_to_groups.userId",
         },
       ],
-    },
-    posts: {
+    })
+    .table("posts", {
       manyToOne: [
         {
           relationName: "user",
@@ -187,64 +230,75 @@ async function main(db: any, args?: string[]) {
           foreignKey: "comments.postId",
         },
       ],
-    },
-    userGroups: {
+    })
+    .table("users_to_groups", {
       manyToOne: [
         {
           relationName: "user",
           relatedTable: "users",
-          localKey: "userGroups.userId",
+          localKey: "users_to_groups.userId",
           foreignKey: "users.id",
         },
       ],
-    },
-  });
-  const userRepo = schemaMetadata.repoFactory("users", {});
-  const commentRepo = schemaMetadata.repoFactory("comments", {});
-  for (const profile of ['default', 'public', ['public', 'admin'], 'admin']) {
+    })
+    .build();
+    const userRepo = schemaMetadata.repoFactory('users', {});
+    const commentRepo = schemaMetadata.repoFactory("comments", {});
+    const rr = userRepo.searchOne;
+  for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
     try {
-      const users = await userRepo.searchOne({
-        filter: {
+      const users = await userRepo.searchOne(
+        {
+          filter: {
             $or: [
-                { email: { $notLike: "Cierra_Hackett%" } },
-                { "posts.title": { $like: "%sunt aut facere%" } },
-                { 'tags': { $eq: "tag1" } },
-                { 'persona.hobbies': { $in: ["footbal", 'baskeet'] } },
+              { email: { $like: "Cierra_Hackett%" } },
+              { "posts.title": { $like: "%sunt aut facere%" } },
+              { tags: { $in: ["tag1"] } },
+              { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
             ],
+          },
+          order: {
+            name: {
+              direction: "asc",
+              nulls: "last",
+            },
+            age: {
+              direction: "desc",
+              nulls: "last",
+              aggregate: "max",
+            },
+            "profile.bio": {
+              direction: "asc",
+              aggregate: "min",
+            },
+            persona: "desc",
+          },
+          projection: ["id", "name", "tags", "email", "persona.hobbies", 'company.name', 'profile.bio'],
         },
-        order: {
-          name: {
-            direction: "asc",
-            nulls: "last",
-          },
-          age: {
-            direction: "desc",
-            nulls: "last",
-            aggregate: 'max',
-          },
-          "profile.bio": {
-            direction: "asc",
-            aggregate: 'min',
-          },
-          "persona": 'desc'
-        },
-        projection: [
-          "id", 
-          "name", 
-          "tags", 
-          "email", 
-          "persona.hobbies",
-        ],
-        }, profile as any);
-      console.log(`Users fetched successfully with profile ${JSON.stringify(profile)}`, users);
+        profile as any,
+      );
+      console.log(
+        `Users fetched successfully with profile ${JSON.stringify(profile)}`,
+        users,
+      );
     } catch (e: any) {
-      console.log(`Error fetching users with profile ${JSON.stringify(profile)}: ${e.message}`);
+      console.log(
+        `Error fetching users with profile ${JSON.stringify(profile)}: ${e.message}`,
+      );
     }
   }
 
   const comments = await commentRepo.searchMany({
-    filter: {},
-    projection: ["id", "content", "postId", "post.user.name", "post.title", 'post.user.persona.hobbies'],
+    filter: {
+    },
+    projection: [
+      "id",
+      "content",
+      "postId",
+      "posts.user.name",
+      "posts.title",
+      "posts.user.persona.hobbies",
+    ],
   });
   console.log("Comments:", JSON.stringify(comments[0], null, 2));
 }

@@ -1,10 +1,8 @@
-import { SQL, eq, asc, desc, sql, getTableColumns, aliasedTable, getTableName } from "drizzle-orm";
-import type { AnyTable } from "drizzle-orm";
+import { SQL, eq, asc, desc, sql, aliasedTable, getTableName } from "drizzle-orm";
 import { getColumn } from "./alias-manager";
 import type { AliasMap } from "./alias-manager";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
-import { min, max } from "drizzle-orm"; // Note: min/max imports may vary by dialect, sql`` is safer
 import { buildJsonExtractionSql } from "./json-resolver";
 
 /**
@@ -72,6 +70,7 @@ export function buildSelection(
 
   return selection;
 }
+
 export function applyJoins(
   qb: any, // The Drizzle query builder instance
   paths: Set<string>,
