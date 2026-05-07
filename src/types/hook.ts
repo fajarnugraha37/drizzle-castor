@@ -34,6 +34,8 @@ export type TableHooks<
   ) => Promise<void> | void;
   beforeSoftDelete?: (filter: FilterQuery<TEntity>) => Promise<void> | void;
   afterSoftDelete?: (affected: TEntity[]) => Promise<void> | void;
+  beforeRestore?: (filter: FilterQuery<TEntity>) => Promise<void> | void;
+  afterRestore?: (affected: TEntity[]) => Promise<void> | void;
   beforeHardDelete?: (filter: FilterQuery<TEntity>) => Promise<void> | void;
   afterHardDelete?: (affected: TEntity[]) => Promise<void> | void;
 };

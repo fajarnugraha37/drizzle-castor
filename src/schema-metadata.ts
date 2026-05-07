@@ -2,6 +2,7 @@ import { executeCreateOne, executeCreateMany } from "./mutations/create";
 import { executeUpdateOne, executeUpdateMany } from "./mutations/update";
 import { executeSearchOne, executeSearchPage, executeSearchMany } from "./queries/search";
 import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete";
+import { executeSoftDeleteOne, executeSoftDeleteMany, executeRestoreOne, executeRestoreMany } from "./mutations/soft-delete";
 import { getTableName } from "drizzle-orm";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
 
@@ -156,30 +157,28 @@ export function defineSchemaMetadata<
           return executeUpdateMany(filter, set, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         softDeleteOne: async (id, profile) => {
-          checkAccess("softDelete", profile as any);
-          console.log(`Executing softDeleteOne on ${tableName} with id: ${id}`);
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeSoftDeleteOne(id, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         softDeleteMany: async (filter, profile) => {
-          checkAccess("softDelete", profile as any);
-          console.log(
-            `Executing softDeleteMany on ${tableName} with filter:`,
-            filter,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeSoftDeleteMany(filter, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         restoreOne: async (id, profile) => {
-          checkAccess("restore", profile as any);
-          console.log(`Executing restoreOne on ${tableName} with id: ${id}`);
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeRestoreOne(id, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         restoreMany: async (filter, profile) => {
-          checkAccess("restore", profile as any);
-          console.log(
-            `Executing restoreMany on ${tableName} with filter:`,
-            filter,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeRestoreMany(filter, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         hardDeleteOne: async (id, profile) => {
           const tableConfig = (metadata as any)[tableName];

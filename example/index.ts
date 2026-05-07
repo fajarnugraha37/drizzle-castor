@@ -116,24 +116,36 @@ async function main(db: any, args?: string[]) {
       },
       hooks: {
         beforeSearch: async (query): Promise<void> => {
-          console.log(`[Hooks] Before search hook triggered`);
+          // console.log(`[Hooks] Before search hook triggered`);
           // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
         },
         afterSearch: async (query, result): Promise<void> => {
-          console.log(`[Hooks] After search hook triggered`);
+          // console.log(`[Hooks] After search hook triggered`);
           // console.log(`[Hooks] After search hook triggered for users with query:`, query);
-          // console.log(`[Hooks] Search result:`, result[0].name);
+          // console.log(`[Hooks] Search result:`, result[0]?.name);
         },
         beforeCreate: async (data): Promise<void> => {
-          console.log(`[Hooks] Before create hook triggered`);
+          // console.log(`[Hooks] Before create hook triggered`);
           // console.log(`[Hooks] Before create hook triggered for users with data:`, data);
         },
         afterCreate: async (data): Promise<void> => {
-          console.log(`[Hooks] After create hook triggered`);
+          // console.log(`[Hooks] After create hook triggered`);
           // console.log(`[Hooks] After create hook triggered for users with data:`, data);
           // console.log(`[Hooks] Created user:`, result.name);
         },
       },
+      softDelete: {
+        deleteValue: {
+          deletedFlag: 1,
+          deletedAt: () => Date.now(),
+          deletedBy: "system_deleter"
+        },
+        restoreValue: {
+          deletedFlag: 0,
+          deletedAt: null,
+          deletedBy: null
+        }
+      }
     })
     .table("profiles", {
       oneToOne: [
