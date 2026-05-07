@@ -1,0 +1,135 @@
+import type { InferEntity, FindTable } from "./helper";
+import type { FlattenPaths, DeepPick, SearchQuery, FilterQuery } from "./query";
+import type { AnyDatabase, AnyTable } from "./schema-metadata";
+import type { InferInsert } from "./value";
+
+// --- REPOSITORY PROFILES CONFIGURATION ---
+export type RepoProfileConfig<
+  TSchema extends {
+    db: AnyDatabase;
+    tables: readonly AnyTable[];
+    metadata: any;
+  },
+  TTableName extends string,
+  TEntityPaths = FlattenPaths<InferEntity<TSchema, TTableName>> | "*",
+  TInsertKeys =
+    | (keyof InferInsert<FindTable<TSchema["tables"], TTableName>> & string)
+    | "*",
+> = {
+  allowedSets?: readonly TInsertKeys[];
+  allowedProjections?: readonly TEntityPaths[];
+  allowedFilters?: readonly TEntityPaths[];
+  allowedSorts?: readonly TEntityPaths[];
+};
+
+export type DbQueryResult<TEntity, Q extends { projection?: any }> =
+  Q["projection"] extends Array<string>
+    ? DeepPick<TEntity, Q["projection"][number]>
+    : TEntity;
+
+export type Repository<
+  TSchema extends {
+    db: AnyDatabase;
+    tables: readonly AnyTable[];
+    metadata: any;
+  },
+  TTableName extends string,
+  TProfiles extends Record<string, any>,
+  TProfileNames = keyof TProfiles | (string & {}),
+  TEntity = InferEntity<TSchema, TTableName>,
+  TInsert = InferInsert<FindTable<TSchema["tables"], TTableName>>,
+> = {
+  // P default ke 'default' (atau fallback ke string biasa jika profil tidak terdefinisi)
+  createOne: (
+    data: TInsert,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<TEntity>;
+  createMany: (
+    data: TInsert[],
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<TEntity[]>;
+
+  searchOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">>(
+    query: Q,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<DbQueryResult<TEntity, Q> | null>;
+  searchPage: <Q extends SearchQuery<TEntity>>(
+    query: Q,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<{
+    data: DbQueryResult<TEntity, Q>[];
+    meta: {
+      currentPage: number;
+      pageSize: number;
+      totalPages: number;
+      totalItems: number;
+    };
+  }>;
+  searchMany: <Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">>(
+    query: Q,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<DbQueryResult<TEntity, Q>[]>;
+
+  searchDeletedOne: <
+    Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">,
+  >(
+    query: Q,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<DbQueryResult<TEntity, Q> | null>;
+  searchDeletedPage: <Q extends SearchQuery<TEntity>>(
+    query: Q,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<{
+    data: DbQueryResult<TEntity, Q>[];
+    meta: {
+      currentPage: number;
+      pageSize: number;
+      totalPages: number;
+      totalItems: number;
+    };
+  }>;
+  searchDeletedMany: <
+    Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">,
+  >(
+    query: Q,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<DbQueryResult<TEntity, Q>[]>;
+
+  updateOne: (
+    id: string | number,
+    set: Partial<TInsert>,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<TEntity | null>;
+  updateMany: (
+    filter: FilterQuery<TEntity>,
+    set: Partial<TInsert>,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<TEntity[]>;
+
+  softDeleteOne: (
+    id: string | number,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<boolean>;
+  softDeleteMany: (
+    filter: FilterQuery<TEntity>,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<number>;
+
+  restoreOne: (
+    id: string | number,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<boolean>;
+  restoreMany: (
+    filter: FilterQuery<TEntity>,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<number>;
+
+  hardDeleteOne: (
+    id: string | number,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<boolean>;
+  hardDeleteMany: (
+    filter: FilterQuery<TEntity>,
+    profile?: TProfileNames | TProfileNames[],
+  ) => Promise<number>;
+};

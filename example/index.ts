@@ -1,10 +1,6 @@
-/// <reference path="../src/types/global.d.ts" />
-/// <reference path="../src/types/helper.d.ts" />
-/// <reference path="../src/types/query.ts" />
-/// <reference path="../src/types/schema-metadata.d.ts" />
-
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { createSchemaBuilder, defineSchemaMetadata } from "../src/index";
+import { createSchemaBuilder, defineSchemaMetadata } from "../";
+import type {  } from "../";
 import { seed } from "./seed";
 import {
   companiesTable,

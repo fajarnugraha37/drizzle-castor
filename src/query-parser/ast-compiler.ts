@@ -4,6 +4,7 @@ import type { AliasMap } from "./alias-manager";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
 import { buildJsonExtractionSql } from "./json-resolver";
+import type { AnyDatabase } from "../types";
 
 /**
  * Builds a specific selection object for Drizzle to only select requested columns.

@@ -1,6 +1,7 @@
 import { aliasedTable, getTableName } from "drizzle-orm";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildJsonExtractionSql } from "./json-resolver";
+import type { AnyTable } from "../types";
 
 export type AliasMap = Map<string, AnyTable>;
 

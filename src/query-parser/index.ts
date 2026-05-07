@@ -9,6 +9,7 @@ import { sql, getTableName } from "drizzle-orm";
 import { analyzeQuery } from "./analyzer";
 import { buildAliases } from "./alias-manager";
 import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compiler";
+import type { AnyTable, SearchQuery } from "../types";
 
 export type TranslatorContext = {
   db: any;

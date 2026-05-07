@@ -1,54 +1,30 @@
 import { buildSearchQueries, hydrateResults } from "./query-parser";
-import type { 
-  TStrictSchemaMetadata, 
-  TSchemaContext, 
-  TableConfig, 
-  RepoProfileConfig, 
-  Repository, 
-  DbAction,
-  StrictRelations
-} from "./types/schema-metadata.d";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],
 >(db: TDb, tables: TTables, mode: "strict" | "lenient" = "lenient") {
   if (mode === "lenient") {
-    console.warn("[Drizzle-CRUD] Warning: Running in lenient mode. Unprotected tables will allow all actions by default.");
+    console.warn(
+      "[Drizzle-Castor] Warning: Running in lenient mode. Unprotected tables will allow all actions by default.",
+    );
   }
-  type _TTStrictSchemaMetadata = TStrictSchemaMetadata<
-    TDb,
-    TTables
-  >["metadata"];
-  return function <const TMetadata extends _TTStrictSchemaMetadata>(
+  
+  return function <const TMetadata extends TSchemaMetadata<TDb, TTables>>(
     metadata: TMetadata,
   ) {
-    type _TSchemaContext = TSchemaContext<TDb, TTables, TMetadata>;
-    type _TTableNames = keyof TMetadata & string;
-    type _TProfileNames<TName extends _TTableNames> =
-      TMetadata[TName] extends TableConfig<_TSchemaContext, TName>
-        ? keyof TMetadata[TName]["profiles"] & string
-        : "never";
-    type _RepoProfileConfig<TName extends _TTableNames> = RepoProfileConfig<
-      _TSchemaContext,
-      TName
-    >;
-    type _TProfiles<TName extends _TTableNames> = Partial<
-      {
-        [K in _TProfileNames<TName>]?: _RepoProfileConfig<TName>;
-      } & {
-        [key: string]: _RepoProfileConfig<TName>;
-      }
-    >;
-
     const repoFactory = <
-      TName extends _TTableNames,
-      TProfiles extends _TProfiles<TName>,
+      TName extends TTableNames<TDb, TTables, TMetadata>,
+      TProfiles extends TProfileOptions<TDb, TTables, TMetadata, TName>,
     >(
       tableName: TName,
       options: TProfiles,
-    ): Repository<_TSchemaContext, TName, TProfiles> => {
-      
+    ): Repository<
+      TSchemaContext<TDb, TTables, TMetadata>,
+      TName,
+      TProfiles
+    > => {
       const translatorContext = {
         db,
         tables,
@@ -56,20 +32,31 @@ export function defineSchemaMetadata<
         baseTableName: tableName,
       };
 
-      const checkAccess = (action: DbAction, requestedProfile?: string | string[]) => {
+      const checkAccess = (
+        action: DbAction,
+        requestedProfile?: string | string[],
+      ) => {
         const tableConfig = (metadata as any)[tableName];
-        
-        if (!tableConfig || !tableConfig.profiles || Object.keys(tableConfig.profiles).length === 0) {
+
+        if (
+          !tableConfig ||
+          !tableConfig.profiles ||
+          Object.keys(tableConfig.profiles).length === 0
+        ) {
           if (mode === "lenient") return; // Allow by default in lenient mode
-          throw new Error(`[Access Denied] Table '${tableName}' has no profiles defined in strict mode.`);
+          throw new Error(
+            `[Access Denied] Table '${tableName}' has no profiles defined in strict mode.`,
+          );
         }
 
-        const profilesToCheck = requestedProfile 
-          ? (Array.isArray(requestedProfile) ? requestedProfile : [requestedProfile])
+        const profilesToCheck = requestedProfile
+          ? Array.isArray(requestedProfile)
+            ? requestedProfile
+            : [requestedProfile]
           : ["default"];
 
         if (profilesToCheck.length === 0) {
-           profilesToCheck.push("default");
+          profilesToCheck.push("default");
         }
 
         let hasAccess = false;
@@ -90,9 +77,13 @@ export function defineSchemaMetadata<
         if (!hasAccess) {
           const profileStr = profilesToCheck.join(", ");
           if (missingProfiles.length === profilesToCheck.length) {
-             throw new Error(`[Access Denied] None of the profiles '${profileStr}' are defined for table '${tableName}'.`);
+            throw new Error(
+              `[Access Denied] None of the profiles '${profileStr}' are defined for table '${tableName}'.`,
+            );
           }
-          throw new Error(`[Access Denied] Action '${action}' is denied for profiles '${profileStr}' on table '${tableName}'.`);
+          throw new Error(
+            `[Access Denied] Action '${action}' is denied for profiles '${profileStr}' on table '${tableName}'.`,
+          );
         }
       };
 
@@ -113,18 +104,18 @@ export function defineSchemaMetadata<
           const hooks = tableConfig?.hooks;
 
           if (hooks?.beforeSearch) {
-             await hooks.beforeSearch(query);
+            await hooks.beforeSearch(query);
           }
 
           // Use buildSearchQueries with isPaginated=true and pageSize=1
           const q = { ...query, page: 1, pageSize: 1 } as any;
           const { mainQuery } = buildSearchQueries(q, translatorContext, true);
-          
+
           const rawRows = await mainQuery;
           const data = hydrateResults(rawRows, tableName, metadata);
 
           if (hooks?.afterSearch) {
-             await hooks.afterSearch(query, data);
+            await hooks.afterSearch(query, data);
           }
 
           return data.length > 0 ? data[0] : null;
@@ -133,16 +124,20 @@ export function defineSchemaMetadata<
           checkAccess("read", profile as any);
           const page = query.page ?? 1;
           const pageSize = query.pageSize ?? 10;
-          
+
           const tableConfig = (metadata as any)[tableName];
           const hooks = tableConfig?.hooks;
 
           if (hooks?.beforeSearch) {
-             await hooks.beforeSearch(query);
+            await hooks.beforeSearch(query);
           }
 
-          const { mainQuery, countQuery } = buildSearchQueries(query as any, translatorContext, true);
-          
+          const { mainQuery, countQuery } = buildSearchQueries(
+            query as any,
+            translatorContext,
+            true,
+          );
+
           // Execute Count query
           const countResult = await countQuery;
           const totalItems = Number(countResult[0]?.count || 0);
@@ -151,11 +146,16 @@ export function defineSchemaMetadata<
           if (totalItems === 0) {
             const emptyResult: any[] = [];
             if (hooks?.afterSearch) {
-               await hooks.afterSearch(query, emptyResult);
+              await hooks.afterSearch(query, emptyResult);
             }
-            return { 
-              data: emptyResult, 
-              meta: { currentPage: page, pageSize, totalPages: 0, totalItems: 0 } 
+            return {
+              data: emptyResult,
+              meta: {
+                currentPage: page,
+                pageSize,
+                totalPages: 0,
+                totalItems: 0,
+              },
             } as any;
           }
 
@@ -164,12 +164,12 @@ export function defineSchemaMetadata<
           const data = hydrateResults(rawRows, tableName, metadata);
 
           if (hooks?.afterSearch) {
-             await hooks.afterSearch(query, data);
+            await hooks.afterSearch(query, data);
           }
 
-          return { 
-            data, 
-            meta: { currentPage: page, pageSize, totalPages, totalItems } 
+          return {
+            data,
+            meta: { currentPage: page, pageSize, totalPages, totalItems },
           } as any;
         },
         searchMany: async (query, profile) => {
@@ -178,17 +178,21 @@ export function defineSchemaMetadata<
           const hooks = tableConfig?.hooks;
 
           if (hooks?.beforeSearch) {
-             await hooks.beforeSearch(query);
+            await hooks.beforeSearch(query);
           }
 
-          const { mainQuery } = buildSearchQueries(query as any, translatorContext, false);
-          
+          const { mainQuery } = buildSearchQueries(
+            query as any,
+            translatorContext,
+            false,
+          );
+
           // Execute Main Query (which wraps the CTE) & Hydrate
           const rawRows = await mainQuery;
           const data = hydrateResults(rawRows, tableName, metadata);
 
           if (hooks?.afterSearch) {
-             await hooks.afterSearch(query, data);
+            await hooks.afterSearch(query, data);
           }
 
           return data;
@@ -284,42 +288,4 @@ export function defineSchemaMetadata<
       repoFactory,
     };
   };
-}
-
-export class SchemaBuilder<
-  TDb extends AnyDatabase,
-  TTables extends readonly AnyTable[],
-  TMetadata extends Record<string, any> = {}
-> {
-  constructor(
-    private db: TDb,
-    private tables: TTables,
-    private mode: "strict" | "lenient",
-    private metadata: TMetadata = {} as TMetadata
-  ) {}
-
-  table<
-    TName extends TableName<TTables[number]>,
-    TConfig extends TableConfig<TSchemaContext<TDb, TTables, TMetadata>, TName> & 
-      StrictRelations<TTables[number], Extract<TTables[number], { _: { name: TName } }>> = TableConfig<TSchemaContext<TDb, TTables, TMetadata>, TName> & StrictRelations<TTables[number], Extract<TTables[number], { _: { name: TName } }>>
-  >(
-    tableName: TName,
-    config: TConfig
-  ): SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }> {
-    return new SchemaBuilder(this.db, this.tables, this.mode, {
-      ...this.metadata,
-      [tableName]: config,
-    } as any);
-  }
-
-  build() {
-    return defineSchemaMetadata(this.db, this.tables, this.mode)(this.metadata as any);
-  }
-}
-
-export function createSchemaBuilder<
-  TDb extends AnyDatabase,
-  TTables extends readonly AnyTable[],
->(db: TDb, tables: TTables, mode: "strict" | "lenient" = "lenient") {
-  return new SchemaBuilder(db, tables, mode);
 }
