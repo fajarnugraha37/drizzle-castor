@@ -1,45 +1,65 @@
 import { int, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const users = sqliteTable("users", {
+export const usersTable = sqliteTable("users", {
   id: int("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   email: text("email").unique().notNull(),
   age: int("age"),
-  tags: text({ mode: 'json' }).$type<string[]>(), // JSON for array of strings
-  createdAt: int("created_at"),
-  // JSONB for nested data (or use separate tables with relations)
+  tags: text({ mode: 'json' }).$type<string[]>(),
   persona: text({ mode: 'json' }).$type<{ hobbies: string[]; skills: string[] }>(),
-  companyId: int("company_id").references(() => companies.id),
+  
+  companyId: int("company_id").references(() => companiesTable.id),
+
+  createdAt: int("created_at").$default(() => Date.now()),
+  createdBy: text("created_by").default("system"),
+  updatedAt: int("updated_at").$default(() => Date.now()).$onUpdate(() => Date.now()),
+  updatedBy: text("updated_by").default("system").$onUpdate(() => "system"),
+  deletedFlag: int("deleted_flag").default(0),
+  deletedAt: int("deleted_at"),
+  deletedBy: text("deleted_by"),
 });
 
-export const profiles = sqliteTable("profiles", {
+export const postsTable = sqliteTable("posts", {
   id: int("id").primaryKey({ autoIncrement: true }),
-  userId: int("user_id").references(() => users.id),
+  title: text("title").notNull(),
+  userId: int("userId").references(() => usersTable.id),
+  
+  createdAt: int("created_at").$default(() => Date.now()),
+  createdBy: text("created_by").default("system"),
+  updatedAt: int("updated_at").$default(() => Date.now()).$onUpdate(() => Date.now()),
+  updatedBy: text("updated_by").default("system").$onUpdate(() => "system"),
+  deletedFlag: int("deleted_flag").default(0),
+  deletedAt: int("deleted_at"),
+  deletedBy: text("deleted_by"),
+});
+
+export const commentsTable = sqliteTable("comments", {
+  id: int("id").primaryKey({ autoIncrement: true }),
+  content: text("content").notNull(),
+  postId: int("postId").references(() => postsTable.id),
+  
+  createdAt: int("created_at").$default(() => Date.now()),
+  createdBy: text("created_by").default("system"),
+  updatedAt: int("updated_at").$default(() => Date.now()).$onUpdate(() => Date.now()),
+  updatedBy: text("updated_by").default("system").$onUpdate(() => "system"),
+  deletedFlag: int("deleted_flag").default(0),
+  deletedAt: int("deleted_at"),
+  deletedBy: text("deleted_by"),
+});
+
+export const profilesTable = sqliteTable("profiles", {
+  id: int("id").primaryKey({ autoIncrement: true }),
   bio: text("bio"),
   avatarUrl: text("avatar_url"),
+  userId: int("user_id").references(() => usersTable.id),
 });
 
-export const books = sqliteTable("books", {
-  id: int("id").primaryKey({ autoIncrement: true }),
-  userId: int("user_id").references(() => users.id),
-  title: text("title").notNull(),
-  publishedYear: int("published_year"),
-  author: text("author"), // { firstName: string, lastName: string }
-});
-
-export const posts = sqliteTable("posts", {
-  id: int("id").primaryKey({ autoIncrement: true }),
-  content: text("content"),
-  authorId: int("author_id").references(() => users.id),
-  reviewerId: int("reviewer_id"),
-});
-
-export const companies = sqliteTable("companies", {
+export const companiesTable = sqliteTable("companies", {
   id: int("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
 });
 
-export const groups = sqliteTable("groups", {
+export const groupsTable = sqliteTable("groups", {
   id: int("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
 });
@@ -49,10 +69,20 @@ export const userGroups = sqliteTable(
   {
     userId: int("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => usersTable.id),
     groupId: int("group_id")
       .notNull()
-      .references(() => groups.id),
+      .references(() => groupsTable.id),
   },
   (t) => [primaryKey({ columns: [t.userId, t.groupId] })],
 );
+
+export const tables = [
+  usersTable,
+  postsTable,
+  commentsTable,
+  profilesTable,
+  companiesTable,
+  groupsTable,
+  userGroups,
+] as const;

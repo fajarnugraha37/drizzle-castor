@@ -1,69 +1,94 @@
+/// <reference path="../src/types/global.d.ts" />
+/// <reference path="../src/types/helper.d.ts" />
+/// <reference path="../src/types/query.ts" />
+/// <reference path="../src/types/schema-metadata.d.ts" />
+
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { books, companies, groups, posts, profiles, userGroups, users } from "./schema";
 import { defineSchemaMetadata } from "../src/index";
-
-const db = drizzle("db.sqlite");
-
-const schemaMetadata = defineSchemaMetadata(db, [
-  users,
-  profiles,
-  books,
-  companies,
-  groups,
+import { seed } from "./seed";
+import {
+  companiesTable,
+  usersTable,
+  profilesTable,
+  postsTable,
+  commentsTable,
+  groupsTable,
   userGroups,
-  posts,
-] as const)({
-  users: {
-    hooks: {
-      beforeCreate: async (v) => {
-        console.log("Before creating user:", v);
-      },
-      afterCreate: async (v) => {
-        console.log("After creating user:", v);
-      }
-    },
-    profiles: {
-      'asdasd': ['create', 'read'],
-      'asdasd2': ['read']
-    },
-  },
-  books: {
+} from "./schema";
+import { DefaultLogger, Logger } from "drizzle-orm";
+
+{
+  const command = process.argv.splice(2).join(" ");
+  const db = drizzle("db.sqlite", {
+    // logger: true,
+    logger: new DefaultLogger({
+      writer: new (class implements Logger {
+        logQuery(query: string, params: unknown[]): void {
+            console.log("=============== Drizzle ===============");
+            console.log("Executing query:");
+            console.log(query);
+            console.log("With params:");
+            console.log(params);
+            console.log("=======================================");
+        }
+        write(message: string): void {
+            console.log("=============== Drizzle ===============");
+            console.log(message);
+            console.log("=======================================");
+        }
+      })(),
+    }),
+  });
+  switch (command) {
+    case "--seed":
+      console.log("Seeding database...");
+      await seed(db, process.argv.splice(2));
+      console.log("Database seeded successfully.");
+      break;
+    case "--main":
+      console.log("Running main function...");
+      await main(db, process.argv.splice(2));
+      console.log("Main function executed successfully.");
+      break;
+    default:
+      console.log(
+        "Unknown command. Use '--seed' to seed the database or '--main' to run the main function.",
+      );
+      break;
   }
-});
+}
 
-const userRepo = schemaMetadata.repoFactory('users', {
-    'asdasd': {
+async function main(db: any, args?: string[]) {
+  const schemaMetadata = defineSchemaMetadata(db, [
+    companiesTable,
+    usersTable,
+    profilesTable,
+    postsTable,
+    commentsTable,
+    groupsTable,
+    userGroups,
+  ] as const)({
+    users: {},
+    comments: {},
+    companies: {},
+    groups: {},
+    posts: {},
+    profiles: {},
+    userGroups: {},
+  });
+  const userRepo = schemaMetadata.repoFactory("users", {});
+  const users = await userRepo.searchMany({
+    filter: {
+        $or: [
+            { name: { $like: "%Yolanda%" } },
+            { email: { $notLike: "Cierra_Hackett%" } },
+        ]
     },
-    'asdasd2': {
+    order: {
+      name: "asc",
+      age: "desc",
     },
-    'asdassssd': {
-      'allowedFilters': ['*'],
-      'allowedSorts': ['*'],
-      'allowedProjections': ['*'],
-    }
-    // 'asdasd2': {
-    //     'allowedFilters': ['id', 'name'],
-    //     'allowedSorts': ['id', 'name'],
-    //     'allowedProjections': ['id', 'name'],
-    // }
-});
-
-userRepo.createOne({
-  email: "user@example.com",
-  name: "John Doe",
-  age: 30,
-  'tags': ['tag1', 'tag2'],
-  'persona': {
-    hobbies: ['hobby1', 'hobby2'],
-    skills: ['skill1', 'skill2'],
-  }
-})
-
-userRepo.searchMany({
-  filter: {
-  },
-  order: {
-    name: 'asc',
-  },
-  projection: ['id', 'name', 'tags', 'persona'],
-});
+    projection: ["id", "name", "tags", "persona"],
+  });
+  console.log("Users:", users);
+}
