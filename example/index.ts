@@ -16,8 +16,7 @@ import {
   userGroups,
 } from "./schema";
 import { DefaultLogger, Logger } from "drizzle-orm";
-import {  } from "bun";
-
+import {} from "bun";
 
 {
   const command = process.argv.splice(2).join(" ");
@@ -26,17 +25,17 @@ import {  } from "bun";
     logger: new DefaultLogger({
       writer: new (class implements Logger {
         logQuery(query: string, params: unknown[]): void {
-            // console.log("=============== Drizzle ===============");
-            // console.log("Executing query:");
-            // console.log(query);
-            // console.log("With params:");
-            // console.log(params);
-            // console.log("=======================================");
+          // console.log("=============== Drizzle ===============");
+          // console.log("Executing query:");
+          // console.log(query);
+          // console.log("With params:");
+          // console.log(params);
+          // console.log("=======================================");
         }
         write(message: string): void {
-            // console.log("=============== Drizzle ===============");
-            // console.log(message);
-            // console.log("=======================================");
+          console.log("=============== Drizzle ===============");
+          console.log(message);
+          console.log("=======================================");
         }
       })(),
     }),
@@ -70,70 +69,82 @@ async function main(db: any, args?: string[]) {
     groupsTable,
     userGroups,
   ] as const)({
-    'users': {
-      'oneToOne': [
+    users: {
+      oneToOne: [
         {
           relationName: "profile",
           relatedTable: "profiles",
-          localKey: 'users.id',
-          foreignKey: 'profiles.userId',
+          localKey: "users.id",
+          foreignKey: "profiles.userId",
         },
         {
           relationName: "company",
           relatedTable: "companies",
-          localKey: 'users.companyId',
-          foreignKey: 'companies.id',
-        }
+          localKey: "users.companyId",
+          foreignKey: "companies.id",
+        },
       ],
-      'oneToMany': [
+      oneToMany: [
         {
           relationName: "posts",
           relatedTable: "posts",
-          localKey: 'users.id',
-          foreignKey: 'posts.userId',
-        }
+          localKey: "users.id",
+          foreignKey: "posts.userId",
+        },
       ],
-      'manyToMany': [
+      manyToMany: [
         {
           relationName: "groups",
           joinTable: "users_to_groups",
-          localKey: 'users.id',
-          joinLocalKey: 'users_to_groups.userId',
-          relatedTable: 'groups',
-          relatedKey: 'groups.id',
-          joinRelatedKey: 'users_to_groups.groupId',
-        }
+          localKey: "users.id",
+          joinLocalKey: "users_to_groups.userId",
+          relatedTable: "groups",
+          relatedKey: "groups.id",
+          joinRelatedKey: "users_to_groups.groupId",
+        },
       ],
+      profiles: {
+        default: ["read"],
+        public: [],
+        admin: [
+          "create",
+          "read",
+          "update",
+          "softDelete",
+          "restore",
+          "hardDelete",
+        ],
+      },
       hooks: {
-        'beforeSearch': async (query): Promise<void> => {
-          console.log(`[Hooks] Before search hook triggered`); 
+        beforeSearch: async (query): Promise<void> => {
+          // console.log(`[Hooks] Before search hook triggered`);
           // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
         },
-        'afterSearch': async (query, result): Promise<void> => {
-          console.log(`[Hooks] After search hook triggered`);
+        afterSearch: async (query, result): Promise<void> => {
+          // console.log(`[Hooks] After search hook triggered`);
           // console.log(`[Hooks] After search hook triggered for users with query:`, query);
           // console.log(`[Hooks] Search result:`, result[0].name);
-        }
-      }
+        },
+      },
     },
     profiles: {
       oneToOne: [
         {
           relationName: "user",
           relatedTable: "users",
-          localKey: 'profiles.userId',
-          foreignKey: 'users.id',
-        }
+          localKey: "profiles.userId",
+          foreignKey: "users.id",
+        },
       ],
     },
     comments: {
       manyToOne: [
         {
-          'relationName': "post",
-          'relatedTable': 'posts',
-          'localKey': 'comments.postId',
-          'foreignKey': 'posts.id',
-        }
+          relationName: "post",
+          relatedTable: "posts",
+          localKey: "comments.postId",
+          foreignKey: "posts.id",
+        },
       ],
     },
     companies: {
@@ -141,9 +152,9 @@ async function main(db: any, args?: string[]) {
         {
           relationName: "users",
           relatedTable: "users",
-          localKey: 'companies.id',
-          foreignKey: 'users.companyId',
-        }
+          localKey: "companies.id",
+          foreignKey: "users.companyId",
+        },
       ],
     },
     groups: {
@@ -151,12 +162,12 @@ async function main(db: any, args?: string[]) {
         {
           relationName: "users",
           joinTable: "users_to_groups",
-          localKey: 'groups.id',
-          joinLocalKey: 'users_to_groups.groupId',
-          relatedTable: 'users',
-          relatedKey: 'users.id',
-          joinRelatedKey: 'users_to_groups.userId',
-        }
+          localKey: "groups.id",
+          joinLocalKey: "users_to_groups.groupId",
+          relatedTable: "users",
+          relatedKey: "users.id",
+          joinRelatedKey: "users_to_groups.userId",
+        },
       ],
     },
     posts: {
@@ -164,17 +175,17 @@ async function main(db: any, args?: string[]) {
         {
           relationName: "user",
           relatedTable: "users",
-          localKey: 'posts.userId',
-          foreignKey: 'users.id',
-        }
+          localKey: "posts.userId",
+          foreignKey: "users.id",
+        },
       ],
       oneToMany: [
         {
           relationName: "comments",
           relatedTable: "comments",
-          localKey: 'posts.id',
-          foreignKey: 'comments.postId',
-        }
+          localKey: "posts.id",
+          foreignKey: "comments.postId",
+        },
       ],
     },
     userGroups: {
@@ -182,58 +193,54 @@ async function main(db: any, args?: string[]) {
         {
           relationName: "user",
           relatedTable: "users",
-          localKey: 'userGroups.userId',
-          foreignKey: 'users.id',
-        }
+          localKey: "userGroups.userId",
+          foreignKey: "users.id",
+        },
       ],
     },
   });
-  const userRepo = schemaMetadata.repoFactory("users", {
-  });
-  const commentRepo = schemaMetadata.repoFactory("comments", {
-  });
-  const users = await userRepo.searchOne({
-    // page: 1,
-    // pageSize: 10,
-    filter: {
-        $or: [
-            { email: { $notLike: "Cierra_Hackett%" } },
-            { "posts.title": { $like: "%sunt aut facere%" } },
-        ]
-    },
-    order: {
-      name: "asc",
-      age: "desc",
-      "profile.bio": {
-        direction: "asc",
-        aggregate: "min",
-      }
-    },
-    projection: [
-      "id", 
-      "name", 
-      "tags", 
-      "email", 
-      // "profile.bio",
-      // "profile.avatarUrl",
-      // "company.name",
-      // "posts.title", 
-      // "posts.comments.content",
-      // "groups.name",
-    ],
-  });
-  console.log("Users:", users);
+  const userRepo = schemaMetadata.repoFactory("users", {});
+  const commentRepo = schemaMetadata.repoFactory("comments", {});
+  for (const profile of ['default', 'public', ['public', 'admin'], 'admin']) {
+    try {
+      const users = await userRepo.searchOne({
+        filter: {
+            $or: [
+                { email: { $notLike: "Cierra_Hackett%" } },
+                { "posts.title": { $like: "%sunt aut facere%" } },
+            ],
+        },
+        order: {
+          name: {
+            direction: "asc",
+            nulls: "last",
+          },
+          age: {
+            direction: "desc",
+            nulls: "last",
+            aggregate: 'max',
+          },
+          "profile.bio": {
+            direction: "asc",
+            aggregate: 'min',
+          }
+        },
+        projection: [
+          "id", 
+          "name", 
+          "tags", 
+          "email", 
+        ],
+      }, profile as any);
+      console.log(`Users fetched successfully with profile ${JSON.stringify(profile)}`);
+    } catch (e: any) {
+      console.log(`Error fetching users with profile ${JSON.stringify(profile)}: ${e.message}`);
+    }
+  }
 
   const comments = await commentRepo.searchMany({
-    filter: {
-    },
-    projection: [
-      "id",
-      "content",
-      "postId",
-      "post.user.name",
-      "post.title",
-    ],
+    filter: {},
+    projection: ["id", "content", "postId", "post.user.name", "post.title"],
   });
-  console.log("Comments:", comments.at(0));
+  console.log("Comments:", comments[0]);
 }

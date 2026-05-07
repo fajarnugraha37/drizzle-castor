@@ -144,19 +144,19 @@ declare global {
     TInsert = InferInsert<FindTable<TSchema["tables"], TTableName>>,
   > = {
     // P default ke 'default' (atau fallback ke string biasa jika profil tidak terdefinisi)
-    createOne: (data: TInsert, profile?: TProfileNames) => Promise<TEntity>;
+    createOne: (data: TInsert, profile?: TProfileNames | TProfileNames[]) => Promise<TEntity>;
     createMany: (
       data: TInsert[],
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<TEntity[]>;
 
     searchOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">>(
       query: Q,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<DbQueryResult<TEntity, Q> | null>;
     searchPage: <Q extends SearchQuery<TEntity>>(
       query: Q,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<{
       data: DbQueryResult<TEntity, Q>[];
       meta: {
@@ -168,16 +168,16 @@ declare global {
     }>;
     searchMany: <Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">>(
       query: Q,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<DbQueryResult<TEntity, Q>[]>;
 
     searchDeletedOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">>(
       query: Q,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<DbQueryResult<TEntity, Q> | null>;
     searchDeletedPage: <Q extends SearchQuery<TEntity>>(
       query: Q,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<{
       data: DbQueryResult<TEntity, Q>[];
       meta: {
@@ -189,45 +189,45 @@ declare global {
     }>;
     searchDeletedMany: <Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">>(
       query: Q,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<DbQueryResult<TEntity, Q>[]>;
 
     updateOne: (
       id: string | number,
       set: Partial<TInsert>,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<TEntity | null>;
     updateMany: (
       filter: FilterQuery<TEntity>,
       set: Partial<TInsert>,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<TEntity[]>;
 
     softDeleteOne: (
       id: string | number,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<boolean>;
     softDeleteMany: (
       filter: FilterQuery<TEntity>,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<number>;
 
     restoreOne: (
       id: string | number,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<boolean>;
     restoreMany: (
       filter: FilterQuery<TEntity>,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<number>;
 
     hardDeleteOne: (
       id: string | number,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<boolean>;
     hardDeleteMany: (
       filter: FilterQuery<TEntity>,
-      profile?: TProfileNames,
+      profile?: TProfileNames | TProfileNames[],
     ) => Promise<number>;
   };
 }
