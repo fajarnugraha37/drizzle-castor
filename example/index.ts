@@ -330,4 +330,27 @@ async function main(db: any, args?: string[]) {
   //     );
   //   }
   // }
+
+  console.log("\n=== Testing updateOne ===");
+  try {
+    const updatedUser = await userRepo.updateOne(1, {
+      name: "Updated User Name",
+      age: 99,
+    }, "admin");
+    console.log("Updated User:", JSON.stringify(updatedUser, null, 2));
+  } catch (err: any) {
+    console.error("Error updating user:", err.message);
+  }
+
+  console.log("\n=== Testing updateMany ===");
+  try {
+    const updatedUsers = await userRepo.updateMany({
+      email: { $like: "Cierra_Hackett%" }
+    } as any, {
+      age: 100,
+    }, "admin");
+    console.log("Updated Many Users:", JSON.stringify(updatedUsers, null, 2));
+  } catch (err: any) {
+    console.error("Error bulk updating users:", err.message);
+  }
 }

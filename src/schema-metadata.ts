@@ -1,4 +1,5 @@
 import { executeCreateOne, executeCreateMany } from "./mutations/create";
+import { executeUpdateOne, executeUpdateMany } from "./mutations/update";
 import { executeSearchOne, executeSearchPage, executeSearchMany } from "./queries/search";
 import { getTableName } from "drizzle-orm";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
@@ -142,22 +143,16 @@ export function defineSchemaMetadata<
           throw new Error("Not implemented");
         },
         updateOne: async (id, set, profile) => {
-          checkAccess("update", profile as any);
-          console.log(
-            `Executing updateOne on ${tableName} with id: ${id} and set:`,
-            set,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeUpdateOne(id, set, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         updateMany: async (filter, set, profile) => {
-          checkAccess("update", profile as any);
-          console.log(
-            `Executing updateMany on ${tableName} with filter:`,
-            filter,
-            "and set:",
-            set,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeUpdateMany(filter, set, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         softDeleteOne: async (id, profile) => {
           checkAccess("softDelete", profile as any);
