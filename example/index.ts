@@ -12,6 +12,7 @@ import {
   userGroups,
 } from "./schema";
 import { DefaultLogger, Logger } from "drizzle-orm";
+import { faker } from "@faker-js/faker";
 import {} from "bun";
 import { getDatabaseFileLocation } from "./helper";
 
@@ -101,29 +102,38 @@ async function main(db: any, args?: string[]) {
           joinRelatedKey: "users_to_groups.groupId",
         },
       ],
-      // profiles: {
-      //   default: ["read"],
-      //   public: [],
-      //   admin: [
-      //     "create",
-      //     "read",
-      //     "update",
-      //     "softDelete",
-      //     "restore",
-      //     "hardDelete",
-      //   ],
-      // },
-      // hooks: {
-      //   beforeSearch: async (query): Promise<void> => {
-      //     // console.log(`[Hooks] Before search hook triggered`);
-      //     // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
-      //   },
-      //   afterSearch: async (query, result): Promise<void> => {
-      //     // console.log(`[Hooks] After search hook triggered`);
-      //     // console.log(`[Hooks] After search hook triggered for users with query:`, query);
-      //     // console.log(`[Hooks] Search result:`, result[0].name);
-      //   },
-      // },
+      profiles: {
+        default: ["read"],
+        public: ["read"],
+        admin: [
+          "create",
+          "read",
+          "update",
+          "softDelete",
+          "restore",
+          "hardDelete",
+        ],
+      },
+      hooks: {
+        beforeSearch: async (query): Promise<void> => {
+          console.log(`[Hooks] Before search hook triggered`);
+          // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
+        },
+        afterSearch: async (query, result): Promise<void> => {
+          console.log(`[Hooks] After search hook triggered`);
+          // console.log(`[Hooks] After search hook triggered for users with query:`, query);
+          // console.log(`[Hooks] Search result:`, result[0].name);
+        },
+        beforeCreate: async (data): Promise<void> => {
+          console.log(`[Hooks] Before create hook triggered`);
+          // console.log(`[Hooks] Before create hook triggered for users with data:`, data);
+        },
+        afterCreate: async (data): Promise<void> => {
+          console.log(`[Hooks] After create hook triggered`);
+          // console.log(`[Hooks] After create hook triggered for users with data:`, data);
+          // console.log(`[Hooks] Created user:`, result.name);
+        },
+      },
     })
     .table("profiles", {
       oneToOne: [
@@ -259,4 +269,49 @@ async function main(db: any, args?: string[]) {
     ],
   });
   console.log("Comments:", JSON.stringify(comments[0], null, 2));
+
+  console.log("\n=== Testing createOne ===");
+  for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
+    try {
+      const newUser = await userRepo.createOne({
+        name: "New User CreateOne",
+        email: faker.internet.email(),
+        age: 25,
+        companyId: 1,
+        tags: ["new", "test"],
+        persona: { hobbies: ["coding"], skills: ["typescript"] }
+      }, "admin");
+      console.log("Created User:", JSON.stringify(newUser, null, 2));
+    } catch (err: any) {
+      console.error(`Error creating user with profile ${JSON.stringify(profile)}:`, err.message);
+    }
+  }
+
+  console.log("\n=== Bulk createMany ===");
+  for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
+    try {
+      const newUsers = await userRepo.createMany([
+        {
+          name: "Bulk " + faker.person.fullName(),
+          email: faker.internet.email(),
+          age: faker.number.int({ min: 18, max: 60 }),
+          companyId: faker.number.int({ min: 1, max: 10 }),
+        },
+        {
+          name: "Bulk " + faker.person.fullName(),
+          email: faker.internet.email(),
+          age: faker.number.int({ min: 18, max: 60 }),
+        },
+        {
+          name: "Bulk " + faker.person.fullName(),
+          email: faker.internet.email(),
+          age: faker.number.int({ min: 18, max: 60 }),
+          companyId: faker.number.int({ min: 1, max: 10 }),
+        }
+      ], profile as any);
+      console.log("Created Users:", JSON.stringify(newUsers, null, 2));
+    } catch (err: any) {
+      console.error(`Error creating users with profile ${JSON.stringify(profile)}:`, err.message);
+    }
+  }
 }

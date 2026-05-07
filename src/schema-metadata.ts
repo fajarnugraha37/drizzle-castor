@@ -1,4 +1,6 @@
 import { buildSearchQueries, hydrateResults } from "./query-parser";
+import { executeCreateOne, executeCreateMany } from "./mutations/create";
+import { getTableName } from "drizzle-orm";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
 
 export function defineSchemaMetadata<
@@ -89,14 +91,16 @@ export function defineSchemaMetadata<
 
       return {
         createOne: async (data, profile) => {
-          checkAccess("create", profile as any);
-          console.log(`Executing createOne on ${tableName} with data:`, data);
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeCreateOne(data, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         createMany: async (data, profile) => {
-          checkAccess("create", profile as any);
-          console.log(`Executing createMany on ${tableName} with data:`, data);
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          const baseTable = tables.find((t) => getTableName(t) === tableName);
+          return executeCreateMany(data, checkAccess, profile as any, hooks, translatorContext, baseTable);
         },
         searchOne: async (query, profile) => {
           checkAccess("read", profile as any);
