@@ -19,7 +19,7 @@ import { DefaultLogger, Logger } from "drizzle-orm";
 
 {
   const command = process.argv.splice(2).join(" ");
-  const db = drizzle("db.sqlite", {
+  const db = drizzle("./data/db.sqlite", {
     // logger: true,
     logger: new DefaultLogger({
       writer: new (class implements Logger {
