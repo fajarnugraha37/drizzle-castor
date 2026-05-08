@@ -114,9 +114,11 @@ export async function seed(args?: string[]) {
 
       const commentsCount = faker.number.int({ min: 1, max: 5 });
       for (let j = 1; j <= commentsCount; j++) {
+        const randomAuthor = users[Math.floor(Math.random() * users.length)];
         await db.insert(commentsTable).values({
           content: faker.lorem.sentence(),
           postId: post.id,
+          authorId: randomAuthor.id,
         });
       }
     }

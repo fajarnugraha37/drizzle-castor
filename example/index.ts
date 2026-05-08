@@ -179,5 +179,70 @@ async function playground() {
     console.log(`❌ FAIL: Valid path was blocked: ${e.message}`);
   }
 
+  // 4. BUG-3 (Nested Join Logic) Check
+  console.log("\n[Test 4] BUG-3 (Nested Join Logic) Check:");
+  const groupRepo = schemaMetadata.repoFactory("groups", {});
+
+  try {
+    // 3 Levels deep: groups -> users -> posts -> comments
+    const results = await groupRepo.searchMany({
+      limit: 1,
+      projection: [
+        "name",
+        "users.name",
+        "users.posts.title",
+        "users.posts.comments.content"
+      ]
+    }, "admin");
+
+    console.log(`✅ PASS: Successfully executed 3-level deep nested join.`);
+    if (results.length > 0) {
+      const group = results[0];
+      const user = group.users?.[0];
+      const post = user?.posts?.[0];
+      const comment = post?.comments?.[0];
+      
+      console.log(`Structure Check:`);
+      console.log(` - Group: ${group.name}`);
+      console.log(` - User: ${user?.name || 'N/A'}`);
+      console.log(` - Post: ${post?.title ? 'Exists' : 'N/A'}`);
+      console.log(` - Comment: ${comment?.content ? 'Exists' : 'N/A'}`);
+    }
+  } catch (e: any) {
+    console.log(`❌ FAIL: Nested join failed. Error: ${e.message}`);
+  }
+
+  // 5. Level 5 Stress Test
+  console.log("\n[Test 5] 5-Level Deep Nested Join Check:");
+  try {
+    // Chain: Groups -> Users -> Posts -> Comments -> Author (User) -> Profile
+    const deepResults = await groupRepo.searchMany({
+      limit: 1,
+      projection: [
+        "name",
+        "users.name",
+        "users.posts.title",
+        "users.posts.comments.content",
+        "users.posts.comments.author.name",
+        "users.posts.comments.author.profile.bio"
+      ]
+    }, "admin");
+
+    console.log(`✅ PASS: Successfully executed 5-level deep nested join.`);
+    if (deepResults.length > 0) {
+      const group = deepResults[0];
+      const comment = group.users?.[0]?.posts?.[0]?.comments?.[0];
+      const author = comment?.author;
+      const profile = author?.profile;
+
+      console.log(`Deep Structure Check:`);
+      console.log(` - Group: ${group.name}`);
+      console.log(` - Comment Author: ${author?.name || 'N/A'}`);
+      console.log(` - Author Profile Bio: ${profile?.bio ? 'Exists' : 'N/A'}`);
+    }
+  } catch (e: any) {
+    console.log(`❌ FAIL: 5-level nested join failed. Error: ${e.message}`);
+  }
+
   console.log("\n--- Playground Test Finished ---");
 }

@@ -197,6 +197,12 @@ export const schemaMetadata = createSchemaBuilder(db, [
         localKey: "comments.postId",
         foreignKey: "posts.id",
       },
+      {
+        relationName: "author",
+        relatedTable: "users",
+        localKey: "comments.authorId",
+        foreignKey: "users.id",
+      },
     ],
   })
   .table("companies", {

@@ -54,6 +54,7 @@ export const commentsTable = sqliteTable("comments", {
   id: int("id").primaryKey({ autoIncrement: true }),
   content: text("content").notNull(),
   postId: int("postId").references(() => postsTable.id),
+  authorId: int("author_id").references(() => usersTable.id),
   
   createdAt: int("created_at").$default(() => Date.now()),
   createdBy: text("created_by").default("system"),
