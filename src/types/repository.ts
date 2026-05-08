@@ -56,7 +56,7 @@ export type Repository<
     profile?: TProfileNames | TProfileNames[],
   ) => Promise<TEntity[]>;
 
-  searchOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">>(
+  searchOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter" | "order">>(
     query: Q,
     profile?: TProfileNames | TProfileNames[],
   ) => Promise<DbQueryResult<TEntity, Q> | null>;
