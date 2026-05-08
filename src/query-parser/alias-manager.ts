@@ -1,4 +1,4 @@
-import { aliasedTable, getTableName } from "drizzle-orm";
+import { aliasedTable, getTableName, getTableColumns } from "drizzle-orm";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildJsonExtractionSql } from "./json-resolver";
 import type { AnyTable } from "../types";
@@ -74,6 +74,12 @@ export function getColumn(
     // The first segment of jsonPath is the actual physical column name in the table
     const jsonParts = resolution.jsonPath.split(".");
     const columnName = jsonParts[0]!;
+
+    const columns = getTableColumns(targetTable);
+    if (!Object.prototype.hasOwnProperty.call(columns, columnName)) {
+      throw new Error(`Column '${columnName}' not found on table '${getTableName(targetTable)}'`);
+    }
+
     const rawColumn = targetTable[columnName];
 
     if (!rawColumn) {
