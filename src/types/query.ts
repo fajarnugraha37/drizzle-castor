@@ -8,22 +8,11 @@ export type Primitive =
   | symbol
   | bigint;
 
-/**
- * Optimized Check if a type is a traversable object (not a primitive)
- */
 export type IsTraversable<T> = NonNullable<T> extends Primitive ? false : true;
 
-/**
- * Depth Counter to prevent infinite recursion and maintain performance.
- * Supporting up to 10 levels.
- */
-type Prev = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+type Prev = [never, 0, 1, 2, 3, 4, 5];
 
-/**
- * OPTIMIZED PATH FLATTENING:
- * Uses tail-recursive pattern and simpler conditional logic to reduce compiler load.
- */
-export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 10> = 
+export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 5> = 
   [Depth] extends [never] 
     ? never 
     : T extends object
@@ -32,10 +21,8 @@ export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 1
             ? NonNullable<T[K]> extends ReadonlyArray<infer U>
               ? IsTraversable<U> extends true
                 ? | `${Prefix}${K}`
-                  | `${Prefix}${K}.${number}`
                   | FlattenPaths<NonNullable<U>, `${Prefix}${K}.`, Prev[Depth]>
-                  | FlattenPaths<NonNullable<U>, `${Prefix}${K}.${number}.`, Prev[Depth]>
-                : `${Prefix}${K}` | `${Prefix}${K}.${number}`
+                : `${Prefix}${K}`
               : IsTraversable<T[K]> extends true
                 ? | `${Prefix}${K}`
                   | FlattenPaths<NonNullable<T[K]>, `${Prefix}${K}.`, Prev[Depth]>
@@ -47,43 +34,24 @@ export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 1
 export type Field<T> = FlattenPaths<T>;
 export type FieldValue<T, P extends Field<T>> = ValueAt<T, P>;
 
-/**
- * Optimized ValueAt using faster string parsing.
- */
 export type ValueAt<T, P extends string> = 
   P extends `${infer K}.${infer R}`
     ? K extends keyof T
       ? NonNullable<T[K]> extends ReadonlyArray<infer U>
-        ? R extends `${number}.${infer Rest}`
-          ? ValueAt<NonNullable<U>, Rest>
-          : R extends `${number}`
-            ? U
-            : ValueAt<NonNullable<U>, R>
+        ? ValueAt<NonNullable<U>, R>
         : NonNullable<T[K]> extends object
           ? ValueAt<NonNullable<T[K]>, R>
           : never
-      : K extends `${number}`
-        ? T extends ReadonlyArray<infer U>
-          ? ValueAt<U, R>
-          : never
-        : never
+      : never
     : P extends keyof T
       ? T[P]
-      : P extends `${number}`
-        ? T extends ReadonlyArray<infer U> ? U : never
-        : never;
+      : never;
 
-/**
- * Extract the "leaf" type from a field (unwrap array to get element type)
- */
 export type LeafType<T> =
   NonNullable<T> extends ReadonlyArray<infer U>
     ? NonNullable<U>
     : NonNullable<T>;
 
-/**
- * OPERATORS DEFINITION
- */
 export type ComparisonOps<T> = {
   $eq?: T;
   $ne?: T;
@@ -160,16 +128,6 @@ export type OrderQuery<T> = {
   [K in FlattenPaths<T>]?: OrderFieldConfig;
 };
 
-export type OrderClause<T> = {
-  path: FlattenPaths<T>;
-  direction?: OrderDirection;
-  nulls?: NullsPosition;
-};
-export type OrderQueryArray<T> = OrderClause<T> | OrderClause<T>[];
-
-/**
- * Optimized DeepPick using more efficient mapping.
- */
 export type DeepPick<T, P extends string> =
   T extends ReadonlyArray<infer U>
     ? DeepPick<U, P>[]
@@ -214,3 +172,21 @@ export type UpdateQuery<T, U> = {
 export type DeleteQuery<T> = {
   filter: FilterQuery<T>;
 };
+
+// --- FACTORY HELPERS ---
+
+export function defineFilter<T>(filter: FilterQuery<T>): FilterQuery<T> {
+  return filter;
+}
+
+export function defineSearchQuery<T>(query: SearchQuery<T>): SearchQuery<T> {
+  return query;
+}
+
+export function defineUpdateSet<T>(set: UpdateSet<T>): UpdateSet<T> {
+  return set;
+}
+
+export function defineProjection<T>(p: FlattenPaths<T>[]): FlattenPaths<T>[] {
+  return p;
+}

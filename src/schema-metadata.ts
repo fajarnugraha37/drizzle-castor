@@ -15,7 +15,7 @@ export function defineSchemaMetadata<
       "[Drizzle-Castor] Warning: Running in lenient mode. Unprotected tables will allow all actions by default.",
     );
   }
-  
+
   return function <const TMetadata extends TSchemaMetadata<TDb, TTables>>(
     metadata: TMetadata,
   ) {
@@ -93,6 +93,13 @@ export function defineSchemaMetadata<
       };
 
       return {
+        // --- FACTORY METHODS ---
+        defineFilter: (f) => f,
+        defineProjection: (p) => p,
+        defineQuery: (q) => q,
+        defineUpdateSet: (s) => s,
+        defineInsertValue: (i) => i,
+
         createOne: async (data, profile) => {
           const tableConfig = (metadata as any)[tableName];
           const hooks = tableConfig?.hooks;

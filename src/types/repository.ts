@@ -4,10 +4,6 @@ import type { AnyDatabase, AnyTable } from "./schema-metadata";
 import type { InferInsert } from "./value";
 
 // --- REPOSITORY PROFILES CONFIGURATION ---
-/**
- * Configuration for a specific repository profile.
- * Optimized with depth 2 for paths to keep IDE autocomplete fast during setup.
- */
 export type RepoProfileConfig<
   TSchema extends {
     db: AnyDatabase;
@@ -15,8 +11,6 @@ export type RepoProfileConfig<
     metadata: any;
   },
   TTableName extends string,
-  // We use a shallow depth (2) for configuration to ensure the IDE stays snappy.
-  // Full depth is still supported in actual queries.
   TEntityPaths = FlattenPaths<InferEntity<TSchema, TTableName, []>, "", 2> | "*",
   TInsertKeys =
     | (keyof InferInsert<FindTable<TSchema["tables"], TTableName>> & string)
@@ -45,6 +39,14 @@ export type Repository<
   TEntity = InferEntity<TSchema, TTableName>,
   TInsert = InferInsert<FindTable<TSchema["tables"], TTableName>>,
 > = {
+  // --- FACTORY METHODS (Type Isolation) ---
+  defineFilter: (filter: FilterQuery<TEntity>) => FilterQuery<TEntity>;
+  defineProjection: <P extends FlattenPaths<TEntity>[]>(p: P) => P;
+  defineQuery: <Q extends SearchQuery<TEntity>>(query: Q) => Q;
+  defineUpdateSet: (set: UpdateSet<NonNullable<TInsert>>) => UpdateSet<NonNullable<TInsert>>;
+  defineInsertValue: (data: TInsert) => TInsert;
+
+  // --- CORE METHODS ---
   createOne: (
     data: TInsert,
     profile?: TProfileNames | TProfileNames[],

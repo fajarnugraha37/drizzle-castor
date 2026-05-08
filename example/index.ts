@@ -1,5 +1,4 @@
 import "bun";
-import  "../";
 import { seed } from "./seed";
 import { createExample } from "./modules/create.example";
 import { updateExample } from "./modules/update.example";
@@ -68,7 +67,15 @@ import { schemaMetadata } from "./helper";
 
 async function playground() {
   console.log("--- BUG-2 Verification Playground ---");
-  const userRepo = schemaMetadata.repoFactory("users", {});
+  // FIXED: Usage now follows RepoProfileConfig object structure
+  const userRepo = schemaMetadata.repoFactory("users", {
+    'default': {
+      allowedProjections: ['id', 'name', 'email', 'age', 'zipCode', 'stringId', 'persona', 'occupational', 'settings']
+    },
+    'admin': {
+      allowedProjections: ["*"]
+    },
+  });
 
   // 1. Check data from database (seeded with numeric strings)
   const users = await userRepo.searchPage({
@@ -192,7 +199,7 @@ async function playground() {
         "users.name",
         "users.posts.title",
         "users.posts.comments.content"
-      ]
+      ],
     }, "admin");
 
     console.log(`✅ PASS: Successfully executed 3-level deep nested join.`);
@@ -225,7 +232,14 @@ async function playground() {
         "users.posts.comments.content",
         "users.posts.comments.author.name",
         "users.posts.comments.author.profile.bio"
-      ]
+      ],
+      order: {
+        'users.posts.comments.createdAt': {
+          'aggregate': 'avg',
+          direction: 'desc',
+          'nulls': 'first'
+        }
+      }
     }, "admin");
 
     console.log(`✅ PASS: Successfully executed 5-level deep nested join.`);
