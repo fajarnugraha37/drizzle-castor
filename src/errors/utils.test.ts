@@ -4,6 +4,7 @@ import { CastorError } from "./base";
 import { SecurityError, AccessDeniedError } from "./security";
 import { QueryParsingError, TableNotFoundError, ColumnNotFoundError, RelationNotFoundError, AliasNotFoundError } from "./query";
 import { ConfigurationError } from "./config";
+import { MutationError } from "./mutation";
 
 describe("Error Utilities", () => {
   describe("isCastorError", () => {
@@ -86,6 +87,22 @@ describe("Error Utilities", () => {
     test("Identifies AliasNotFoundError", () => {
       const err = new AliasNotFoundError("test");
       expect(isQueryError(err)).toBe(true);
+    });
+
+    test('Identifies MutationError as QueryError when code is "MUTATION_ERROR"', () => {
+      const err = new MutationError("test", "test mutation error");
+      expect(isQueryError(err)).toBe(true);
+      expect(err.code).toBe("MUTATION_ERROR");
+    });
+
+    test("Identifies bundled objects mimicking QueryError (duck typing)", () => {
+      const fakeErr = { name: "MockError", code: "COLUMN_NOT_FOUND", message: "msg" };
+      expect(isQueryError(fakeErr)).toBe(true);
+    });
+
+    test("Identifies bundled objects mimicking QueryError with different code (duck typing)", () => {
+      const fakeErr = { name: "MockError", code: "SOME_OTHER_ERROR", message: "msg" };
+      expect(isQueryError(fakeErr)).toBe(true);
     });
 
     test("Identifies duck-typed query parsing error", () => {
