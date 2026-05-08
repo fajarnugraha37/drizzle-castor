@@ -70,7 +70,9 @@ async function playground() {
       allowedProjections: ['id', 'name', 'email', 'age', 'zipCode', 'stringId', 'persona', 'occupational', 'settings']
     },
     'admin': {
-      allowedProjections: ["*"]
+      allowedProjections: ["*"],
+      allowedFilters: ["*"],
+      allowedUpdates: ["*"],
     },
   });
 
@@ -81,7 +83,37 @@ async function playground() {
   });
   console.log("User with highest age:", users);
 
-  console.log("\n--- Testing BUG-3: Unvalidated JSON Key Access ---");
+  console.log("\n--- Testing BUG-4: Ambiguous column in subqueries ---");
+  try {
+    const res = await userRepo.updateMany(
+      { "posts.title": { $eq: "My Post" } } as any,
+      { name: "Updated" },
+      "admin"
+    );
+    console.log("✅ PASS: BUG-4 did not cause Ambiguous column on One-to-Many. Result:", res);
+  } catch (error: any) {
+    console.error("❌ FAIL: BUG-4 caused an error on One-to-Many:", error.message);
+  }
+
+  const groupRepo = schemaMetadata.repoFactory("groups", {
+    'admin': {
+      allowedProjections: ["*"],
+      allowedFilters: ["*"],
+      allowedUpdates: ["*"],
+    },
+  });
+
+  try {
+    const res2 = await groupRepo.updateMany(
+      { "users.name": { $eq: "Updated" } } as any,
+      { name: "Updated Group" },
+      "admin"
+    );
+    console.log("✅ PASS: BUG-4 did not cause Ambiguous column on Many-to-Many. Result:", res2);
+  } catch (error: any) {
+    console.error("❌ FAIL: BUG-4 caused an error on Many-to-Many:", error.message);
+  }
+  console.log("--------------------------------------------------\n");
   try {
     // Attempting to update a prototype property, which should be rejected
     await userRepo.updateOne(users!.id, { "toString.path": "hacked" } as any, "admin");

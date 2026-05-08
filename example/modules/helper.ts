@@ -245,6 +245,14 @@ export const schemaMetadata = createSchemaBuilder(db, [
         foreignKey: "comments.postId",
       },
     ],
+    softDelete: {
+      deleteValue: {
+        deletedFlag: 1,
+      },
+      restoreValue: {
+        deletedFlag: 0,
+      },
+    },
   })
   .table("users_to_groups", {
     manyToOne: [
