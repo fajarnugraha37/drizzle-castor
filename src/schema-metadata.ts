@@ -1,6 +1,6 @@
 import { executeCreateOne, executeCreateMany } from "./mutations/create";
 import { executeUpdateOne, executeUpdateMany } from "./mutations/update";
-import { executeSearchOne, executeSearchPage, executeSearchMany, executeSearchDeletedOne, executeSearchDeletedPage, executeSearchDeletedMany } from "./queries/search";
+import { executeSearchOne, executeSearchPage, executeSearchMany, executeSearchDeletedOne, executeSearchDeletedPage, executeSearchDeletedMany } from "./queries";
 import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete";
 import { executeSoftDeleteOne, executeSoftDeleteMany, executeRestoreOne, executeRestoreMany } from "./mutations/soft-delete";
 import { getTableName } from "drizzle-orm";
