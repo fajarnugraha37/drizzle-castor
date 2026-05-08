@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { hydrateResults } from "./hydrator";
+import { hydrateResults } from "../../../src/query-parser/hydrator";
 
 describe("Query Parser: Hydrator", () => {
   const mockMetadata = {

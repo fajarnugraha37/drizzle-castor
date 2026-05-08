@@ -1,7 +1,7 @@
 import { expect, test, describe, mock } from "bun:test";
-import { createFieldRbacMiddleware } from "./field-rbac";
-import { AccessDeniedError } from "../errors";
-import type { MiddlewareContext } from "./index";
+import { createFieldRbacMiddleware } from "../../../src/middleware/field-rbac";
+import { AccessDeniedError } from "../../../src/errors";
+import type { MiddlewareContext } from "../../../src/middleware/index";
 
 describe("Field-Level RBAC Middleware", () => {
   const createMockContext = (

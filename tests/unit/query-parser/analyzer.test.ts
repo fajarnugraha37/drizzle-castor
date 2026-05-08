@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { analyzeQuery, getRelationPath } from "./analyzer";
+import { analyzeQuery, getRelationPath } from "../../../src/query-parser/analyzer";
 
 describe("Query Parser: Analyzer", () => {
   const mockMetadata = {

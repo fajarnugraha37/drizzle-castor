@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { buildFieldOperator, buildConjunction } from "./operator-builder";
+import { buildFieldOperator, buildConjunction } from "../../../src/query-parser/operator-builder";
 import { sql } from "drizzle-orm";
 
 describe("Query Parser: Operator Builder", () => {

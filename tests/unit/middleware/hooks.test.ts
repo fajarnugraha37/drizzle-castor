@@ -1,6 +1,6 @@
 import { expect, test, describe, mock } from "bun:test";
-import { createHooksMiddleware } from "./hooks";
-import type { MiddlewareContext } from "./index";
+import { createHooksMiddleware } from "../../../src/middleware/hooks";
+import type { MiddlewareContext } from "../../../src/middleware/index";
 
 describe("Hooks Middleware", () => {
   const middleware = createHooksMiddleware();

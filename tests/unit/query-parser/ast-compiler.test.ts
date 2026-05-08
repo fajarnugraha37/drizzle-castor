@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
-import { buildSelection, parseFilter, parseOrder } from "./ast-compiler";
-import { SecurityError } from "../errors";
+import { buildSelection, parseFilter, parseOrder } from "../../../src/query-parser/ast-compiler";
+import { SecurityError } from "../../../src/errors";
 import { sql } from "drizzle-orm";
 
 describe("Query Parser: AST Compiler", () => {

@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
-import { assertSafeKey } from "./security";
-import { SecurityError } from "../errors";
+import { assertSafeKey } from "../../../src/query-parser/security";
+import { SecurityError } from "../../../src/errors";
 
 describe("Query Parser: Security", () => {
   describe("assertSafeKey", () => {

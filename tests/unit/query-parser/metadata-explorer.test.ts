@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
-import { findRelationDefinition, isRelation, resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
-import { QueryParsingError } from "../errors";
+import { findRelationDefinition, isRelation, resolvePathSegments, resolveRelationPath } from "../../../src/query-parser/metadata-explorer";
+import { QueryParsingError } from "../../../src/errors";
 
 describe("Query Parser: Metadata Explorer", () => {
   const mockMetadata = {

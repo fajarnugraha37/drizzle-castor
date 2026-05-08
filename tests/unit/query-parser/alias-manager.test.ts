@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
-import { generateAliasName, buildAliases } from "./alias-manager";
-import { TableNotFoundError } from "../errors";
+import { generateAliasName, buildAliases } from "../../../src/query-parser/alias-manager";
+import { TableNotFoundError } from "../../../src/errors";
 
 describe("Query Parser: Alias Manager", () => {
   describe("generateAliasName", () => {

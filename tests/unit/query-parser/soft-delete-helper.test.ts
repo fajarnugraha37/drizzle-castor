@@ -1,5 +1,5 @@
 import { expect, test, describe } from "bun:test";
-import { resolveProviderValues, injectSoftDeleteFilter } from "./soft-delete-helper";
+import { resolveProviderValues, injectSoftDeleteFilter } from "../../../src/query-parser/soft-delete-helper";
 
 describe("Query Parser: Soft Delete Helper", () => {
   describe("resolveProviderValues", () => {

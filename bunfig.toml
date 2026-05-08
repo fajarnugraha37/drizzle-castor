@@ -13,7 +13,7 @@ peer = true
 depth = 3
 
 [test]
-root = "./src"
+root = "./tests"
 smol = true
 coverage = true
 coverageThreshold = { lines = 0.50, functions = 0.50 }

@@ -1,10 +1,10 @@
 import { expect, test, describe } from "bun:test";
-import { isCastorError, isSecurityError, isQueryError, getErrorMessage } from "./utils";
-import { CastorError } from "./base";
-import { SecurityError, AccessDeniedError } from "./security";
-import { QueryParsingError, TableNotFoundError, ColumnNotFoundError, RelationNotFoundError, AliasNotFoundError } from "./query";
-import { ConfigurationError } from "./config";
-import { MutationError } from "./mutation";
+import { isCastorError, isSecurityError, isQueryError, getErrorMessage } from "../../../src/errors/utils";
+import { CastorError } from "../../../src/errors/base";
+import { SecurityError, AccessDeniedError } from "../../../src/errors/security";
+import { QueryParsingError, TableNotFoundError, ColumnNotFoundError, RelationNotFoundError, AliasNotFoundError } from "../../../src/errors/query";
+import { ConfigurationError } from "../../../src/errors/config";
+import { MutationError } from "../../../src/errors/mutation";
 
 describe("Error Utilities", () => {
   describe("isCastorError", () => {

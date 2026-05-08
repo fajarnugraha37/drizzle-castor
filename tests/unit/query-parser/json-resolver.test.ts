@@ -1,6 +1,6 @@
 import { expect, test, describe } from "bun:test";
-import { buildJsonExtractionSql, parseUpdateSet } from "./json-resolver";
-import { SecurityError, ColumnNotFoundError } from "../errors";
+import { buildJsonExtractionSql, parseUpdateSet } from "../../../src/query-parser/json-resolver";
+import { SecurityError, ColumnNotFoundError } from "../../../src/errors";
 import { sql } from "drizzle-orm";
 
 describe("Query Parser: JSON Resolver", () => {
