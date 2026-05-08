@@ -10,14 +10,12 @@ export type Primitive =
 
 export type IsTraversable<T> = NonNullable<T> extends Primitive ? false : true;
 
-/**
- * STRICT DEPTH CONTROL (Cap at 5)
- */
 type Prev = [never, 0, 1, 2, 3, 4, 5];
 
 /**
- * OPTIMIZED FLATTEN PATHS:
- * Strictly capped at 5 levels. Optimized for leaf-node discovery.
+ * OPTIMIZED FLATTEN PATHS (Autocomplete Focus):
+ * Only generates object property paths. 
+ * Numeric indices are handled via Template Literal validation to prevent IDE lag.
  */
 export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 5> = 
   [Depth] extends [never] 
@@ -25,30 +23,37 @@ export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 5
     : T extends object
       ? {
           [K in keyof T]-?: K extends string | number
-            ? NonNullable<T[K]> extends ReadonlyArray<infer U>
-              ? IsTraversable<U> extends true
+            ? IsTraversable<T[K]> extends true
                 ? | `${Prefix}${K}`
-                  | FlattenPaths<NonNullable<U>, `${Prefix}${K}.`, Prev[Depth]>
-                : `${Prefix}${K}`
-              : IsTraversable<T[K]> extends true
-                ? | `${Prefix}${K}`
-                  | FlattenPaths<NonNullable<T[K]>, `${Prefix}${K}.`, Prev[Depth]>
+                  | FlattenPaths<LeafType<T[K]>, `${Prefix}${K}.`, Prev[Depth]>
                 : `${Prefix}${K}`
             : never;
         }[keyof T]
       : never;
 
 /**
+ * DYNAMIC PATH VALIDATOR:
+ * Allows the base FlattenPaths PLUS any numeric indexing patterns.
+ */
+export type ValidPath<T> = FlattenPaths<T> | `${FlattenPaths<T>}.${number}` | `${FlattenPaths<T>}.${number}.${string}`;
+
+/**
  * OPTIMIZED VALUE LOOKUP:
- * Uses a flatter lookup pattern to reduce template literal parsing depth.
+ * Robustly handles dots and numbers in the path string.
  */
 export type ValueAt<T, P extends string> = P extends keyof T
   ? T[P]
   : P extends `${infer K}.${infer R}`
     ? K extends keyof T
       ? ValueAt<LeafType<T[K]>, R>
-      : never
-    : never;
+      : K extends `${number}`
+        ? T extends ReadonlyArray<infer U>
+          ? ValueAt<U, R>
+          : never
+        : never
+    : P extends `${number}`
+      ? T extends ReadonlyArray<infer U> ? U : never
+      : never;
 
 export type LeafType<T> =
   NonNullable<T> extends ReadonlyArray<infer U>
@@ -115,8 +120,11 @@ export type Conjunctions<T> = {
   $or?: FilterQuery<T>[];
 };
 
+/**
+ * FilterQuery using ValidPath (Lazy Validation) to keep performance fast.
+ */
 export type FilterQuery<T> = Partial<Conjunctions<T>> & {
-  [K in FlattenPaths<T>]?: FieldOperators<ValueAt<T, K>>;
+  [K in ValidPath<T>]?: FieldOperators<ValueAt<T, K>>;
 };
 
 export type OrderDirection = "asc" | "desc";
@@ -131,7 +139,7 @@ export type OrderFieldConfig =
     };
 
 export type OrderQuery<T> = {
-  [K in FlattenPaths<T>]?: OrderFieldConfig;
+  [K in ValidPath<T>]?: OrderFieldConfig;
 };
 
 export type DeepPick<T, P extends string> =
@@ -159,7 +167,7 @@ export type DeepPick<T, P extends string> =
       };
 
 export type SearchQuery<T> = {
-  projection?: FlattenPaths<T>[];
+  projection?: ValidPath<T>[];
   filter?: FilterQuery<T>;
   order?: OrderQuery<T>;
   page?: number;
@@ -167,7 +175,7 @@ export type SearchQuery<T> = {
 };
 
 export type UpdateSet<T> = {
-  [K in FlattenPaths<T>]?: ValueAt<T, K>;
+  [K in ValidPath<T>]?: ValueAt<T, K>;
 };
 
 export type UpdateQuery<T, U> = {
@@ -179,13 +187,13 @@ export type DeleteQuery<T> = {
   filter: FilterQuery<T>;
 };
 
-// --- RENAMED FACTORY HELPERS ---
+// --- FACTORY HELPERS ---
 
 export function defineFilter<T>(filter: FilterQuery<T>): FilterQuery<T> {
   return filter;
 }
 
-export function defineQuery<T, Q extends SearchQuery<T>['order']>(query: Q): Q {
+export function defineQuery<T>(query: SearchQuery<T>): SearchQuery<T> {
   return query;
 }
 
@@ -193,7 +201,7 @@ export function defineUpdateSet<T>(set: UpdateSet<T>): UpdateSet<T> {
   return set;
 }
 
-export function defineProjection<T>(p: FlattenPaths<T>[]): FlattenPaths<T>[] {
+export function defineProjection<T>(p: ValidPath<T>[]): ValidPath<T>[] {
   return p;
 }
 
