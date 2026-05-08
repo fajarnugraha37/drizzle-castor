@@ -83,7 +83,41 @@ async function playground() {
   });
   console.log("User with highest age:", users);
 
-  console.log("\n--- Testing BUG-4: Ambiguous column in subqueries ---");
+  console.log("\n--- Testing BUG-1: Prototype Pollution ---");
+  try {
+    // Attempting to project __proto__.polluted
+    await userRepo.searchOne({
+      projection: ["persona.__proto__.polluted"] as any
+    }, "admin");
+    console.error("❌ FAIL: BUG-1 is NOT fixed. Projection of __proto__ passed validation.");
+  } catch (error: any) {
+    if (error.message.includes("Security Error")) {
+      console.log("✅ PASS: BUG-1 is fixed. Caught illegal prototype key in projection with message:", error.message);
+    } else {
+      console.error("❌ FAIL: Unexpected error occurred:", error.message);
+    }
+  }
+
+  // Test Hydrator Prototype Pollution directly
+  const { hydrateResults } = require("../src/query-parser/hydrator");
+  try {
+    const maliciousRow = { users: { "persona.__proto__.polluted": "yes" } };
+    hydrateResults([maliciousRow], "users", schemaMetadata.metadata);
+    // If it reaches here without error, check if Object.prototype is polluted
+    if ((Object.prototype as any).polluted === "yes") {
+      console.error("❌ FAIL: BUG-1 is NOT fixed. Object.prototype was polluted!");
+      delete (Object.prototype as any).polluted; // cleanup
+    } else {
+      console.log("✅ PASS: BUG-1 is fixed. Hydrator did not pollute Object.prototype (but didn't throw?).");
+    }
+  } catch (error: any) {
+    if (error.message.includes("Security Error")) {
+      console.log("✅ PASS: BUG-1 is fixed. Hydrator caught illegal prototype key with message:", error.message);
+    } else {
+      console.error("❌ FAIL: Hydrator unexpected error:", error.message);
+    }
+  }
+  console.log("--------------------------------------------------\n");
   try {
     const res = await userRepo.updateMany(
       { "posts.title": { $eq: "My Post" } } as any,

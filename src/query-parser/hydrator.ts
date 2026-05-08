@@ -1,12 +1,13 @@
 import { resolveRelationPath } from "./metadata-explorer";
 import { generateAliasName } from "./alias-manager";
+import { assertSafeKey } from "./security";
 
 /**
  * Utility to unflatten an object with dot-notation keys.
  * Also parses stringified JSON values (common in SQLite json_extract).
  */
 function unflattenAndParseJson(obj: any): any {
-  const result: any = {};
+  const result: any = Object.create(null);
   for (const [key, value] of Object.entries(obj)) {
     let parsedValue = value;
     if (typeof value === "string") {
@@ -25,13 +26,17 @@ function unflattenAndParseJson(obj: any): any {
       let current = result;
       for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i]!;
+        assertSafeKey(part, "hydration");
         if (!current[part]) {
-          current[part] = {};
+          current[part] = Object.create(null);
         }
         current = current[part];
       }
-      current[parts[parts.length - 1]!] = parsedValue;
+      const lastPart = parts[parts.length - 1]!;
+      assertSafeKey(lastPart, "hydration");
+      current[lastPart] = parsedValue;
     } else {
+      assertSafeKey(key, "hydration");
       result[key] = parsedValue;
     }
   }

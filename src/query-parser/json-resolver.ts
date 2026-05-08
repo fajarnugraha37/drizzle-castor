@@ -1,5 +1,6 @@
 import { SQL, sql, getTableColumns } from "drizzle-orm";
 import { getTableName } from "drizzle-orm";
+import { assertSafeKey } from "./security";
 
 /**
  * Validates a JSON path segment for safety against SQL Injection.
@@ -10,6 +11,12 @@ function validateJsonPath(path: string): void {
   const safePattern = /^[a-zA-Z0-9_.[\]]+$/;
   if (!safePattern.test(path)) {
     throw new Error(`Security Error: Invalid characters in JSON path: "${path}"`);
+  }
+  
+  // Explicitly block prototype pollution vectors
+  const parts = path.split('.');
+  for (const part of parts) {
+    assertSafeKey(part, `JSON path: "${path}"`);
   }
 }
 
