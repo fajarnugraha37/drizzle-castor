@@ -6,7 +6,7 @@ import { getTableColumns } from "drizzle-orm";
  */
 export function getPrimaryKeyColumnName(baseTable: any): string {
   const cols = getTableColumns(baseTable);
-  for (const [key, col] of Object.entries(cols)) {
+  for (const [key, col] of Object.entries(cols || {})) {
     if ((col as any).primary) {
       return key;
     }

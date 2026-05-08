@@ -1,16 +1,13 @@
-import { expect, test, describe, mock } from "bun:test";
+import { expect, test, describe } from "bun:test";
 import { getPrimaryKeyColumnName } from "../../../src/helper/column-helper";
 
-// Mock getTableColumns from drizzle-orm
-mock.module("drizzle-orm", () => ({
-  getTableColumns: (table: any) => table.columns || {},
-}));
+const COLUMNS = Symbol.for("drizzle:Columns");
 
 describe("column-helper", () => {
   describe("getPrimaryKeyColumnName", () => {
     test("should return the explicitly marked primary key column", () => {
       const mockTable = {
-        columns: {
+        [COLUMNS]: {
           uuid: { primary: true },
           name: { primary: false },
         },
@@ -20,7 +17,7 @@ describe("column-helper", () => {
 
     test("should fallback to 'id' if no primary key is explicitly marked", () => {
       const mockTable = {
-        columns: {
+        [COLUMNS]: {
           uuid: { primary: false },
           name: { primary: false },
         },
@@ -29,7 +26,7 @@ describe("column-helper", () => {
     });
 
     test("should fallback to 'id' if columns object is empty", () => {
-      const mockTable = { columns: {} };
+      const mockTable = { [COLUMNS]: {} };
       expect(getPrimaryKeyColumnName(mockTable)).toBe("id");
     });
 
@@ -40,7 +37,7 @@ describe("column-helper", () => {
 
     test("should return the first primary key found if multiple exist", () => {
       const mockTable = {
-        columns: {
+        [COLUMNS]: {
           first_pk: { primary: true },
           second_pk: { primary: true },
         },
