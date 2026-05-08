@@ -135,5 +135,49 @@ async function playground() {
 
   // Cleanup
   await userRepo.hardDeleteOne(dangerousUser.id, "admin");
+
+  // 3. BUG-1 (SQL Injection) Security Check
+  console.log("\n[Test 3] BUG-1 (SQL Injection) Security Check:");
+  
+  const injectionVectors = [
+    { 
+      label: "Classic Breakout", 
+      key: "profile.bio'), '$.x', 'y'); DROP TABLE users; --" 
+    },
+    { 
+      label: "Comment Injection", 
+      key: "settings.theme' --" 
+    },
+    { 
+      label: "Function Call", 
+      key: "occupational.position[0].(SELECT 'secret')" 
+    },
+    { 
+      label: "Invalid Symbol", 
+      key: "persona.skills!" 
+    }
+  ];
+
+  for (const vector of injectionVectors) {
+    try {
+      // Note: We use any here because TypeScript would block these keys if we had strict types,
+      // but in a real-world API scenario, these arrive as untyped JSON.
+      await userRepo.updateOne(1, { [vector.key]: "hacker" } as any, "admin");
+      console.log(`❌ FAIL: ${vector.label} reached the database!`);
+    } catch (e: any) {
+      const isSecurityError = e.message.includes("Security Error");
+      console.log(`✅ PASS: ${vector.label} blocked. ${isSecurityError ? '(Type: Security Error)' : '(Type: Other Error)'}`);
+    }
+  }
+
+  // Ensure valid paths still work
+  try {
+    const validKey = "occupational.position";
+    await userRepo.updateOne(1, { [validKey]: "Developer" } as any, "admin");
+    console.log("✅ PASS: Valid nested path works normally.");
+  } catch (e: any) {
+    console.log(`❌ FAIL: Valid path was blocked: ${e.message}`);
+  }
+
   console.log("\n--- Playground Test Finished ---");
 }
