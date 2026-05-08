@@ -1,3 +1,5 @@
+import type { RecursiveDepth } from "./base";
+
 export type Primitive =
   | string
   | number
@@ -17,7 +19,7 @@ type Prev = [never, 0, 1, 2, 3, 4, 5];
  * Only generates object property paths. 
  * Numeric indices are handled via Template Literal validation to prevent IDE lag.
  */
-export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 5> = 
+export type FlattenPaths<T, Prefix extends string = "", Depth extends number = RecursiveDepth> = 
   [Depth] extends [never] 
     ? never 
     : T extends object

@@ -2,6 +2,8 @@ import type { InferEntity, FindTable, InferModel } from "./helper";
 import type { SearchQuery, UpdateQuery, DeleteQuery } from "./query";
 import type { AnyDatabase, AnyTable } from "./schema-metadata";
 
+export type RecursiveDepth = 5;
+
 export type BaseSchema = {
   db: AnyDatabase;
   tables: readonly AnyTable[];

@@ -1,3 +1,5 @@
+import type { RecursiveDepth } from "./base";
+
 // Mencari instance tabel Drizzle berdasarkan string nama tabelnya di DB
 export type FindTable<
   TTables extends readonly any[],
@@ -34,7 +36,7 @@ export type InferEntity<
   TSchema extends { tables: readonly any[]; metadata: any },
   TTableName extends string,
   TDepth extends any[] = [],
-> = TDepth["length"] extends 5
+> = TDepth["length"] extends RecursiveDepth
   ? InferModel<FindTable<TSchema["tables"], TTableName>> // Limit tercapai, stop rekursi relasi
   : InferModel<FindTable<TSchema["tables"], TTableName>> & {
       // Base Columns (id, name, dll)
