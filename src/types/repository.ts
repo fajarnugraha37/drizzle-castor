@@ -78,7 +78,7 @@ export type Repository<
   ) => Promise<DbQueryResult<TEntity, Q>[]>;
 
   searchDeletedOne: <
-    Q extends Pick<SearchQuery<TEntity>, "projection" | "filter">,
+    Q extends Pick<SearchQuery<TEntity>, "projection" | "filter" | "order">,
   >(
     query: Q,
     profile?: TProfileNames | TProfileNames[],
