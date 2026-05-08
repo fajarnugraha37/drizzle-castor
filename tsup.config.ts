@@ -5,6 +5,7 @@ export default defineConfig([
   {
     entryPoints: glob
       .sync("./src/**/*.{ts,js,esm,cjs,tsx,jsx,json,yaml,yml,html,css}")
+      .filter((path) => !/(\.test\.ts|\.spec\.ts)$/.test(path))
       .map((path) => path.replaceAll("\\", "/")),
     tsconfig: "./tsconfig.json",
     outDir: "dist/",
