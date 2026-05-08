@@ -11,7 +11,10 @@ function unflattenAndParseJson(obj: any): any {
     let parsedValue = value;
     if (typeof value === "string") {
       try {
-        parsedValue = JSON.parse(value);
+        const potential = JSON.parse(value);
+        if (potential !== null && typeof potential === "object") {
+          parsedValue = potential;
+        }
       } catch (e) {
         // Not a JSON string, keep as is
       }
@@ -63,7 +66,7 @@ export function hydrateResults(
 
     const baseObj = unflattenAndParseJson(rawBaseObj);
     const rootId = baseObj[primaryKeyField];
-    
+
     if (!rootMap.has(rootId)) {
       rootMap.set(rootId, { ...baseObj });
     } else {
