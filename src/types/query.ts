@@ -10,8 +10,15 @@ export type Primitive =
 
 export type IsTraversable<T> = NonNullable<T> extends Primitive ? false : true;
 
+/**
+ * STRICT DEPTH CONTROL (Cap at 5)
+ */
 type Prev = [never, 0, 1, 2, 3, 4, 5];
 
+/**
+ * OPTIMIZED FLATTEN PATHS:
+ * Strictly capped at 5 levels. Optimized for leaf-node discovery.
+ */
 export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 5> = 
   [Depth] extends [never] 
     ? never 
@@ -31,27 +38,26 @@ export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 5
         }[keyof T]
       : never;
 
-export type Field<T> = FlattenPaths<T>;
-export type FieldValue<T, P extends Field<T>> = ValueAt<T, P>;
-
-export type ValueAt<T, P extends string> = 
-  P extends `${infer K}.${infer R}`
+/**
+ * OPTIMIZED VALUE LOOKUP:
+ * Uses a flatter lookup pattern to reduce template literal parsing depth.
+ */
+export type ValueAt<T, P extends string> = P extends keyof T
+  ? T[P]
+  : P extends `${infer K}.${infer R}`
     ? K extends keyof T
-      ? NonNullable<T[K]> extends ReadonlyArray<infer U>
-        ? ValueAt<NonNullable<U>, R>
-        : NonNullable<T[K]> extends object
-          ? ValueAt<NonNullable<T[K]>, R>
-          : never
+      ? ValueAt<LeafType<T[K]>, R>
       : never
-    : P extends keyof T
-      ? T[P]
-      : never;
+    : never;
 
 export type LeafType<T> =
   NonNullable<T> extends ReadonlyArray<infer U>
     ? NonNullable<U>
     : NonNullable<T>;
 
+/**
+ * OPERATORS
+ */
 export type ComparisonOps<T> = {
   $eq?: T;
   $ne?: T;
@@ -173,13 +179,13 @@ export type DeleteQuery<T> = {
   filter: FilterQuery<T>;
 };
 
-// --- FACTORY HELPERS ---
+// --- RENAMED FACTORY HELPERS ---
 
 export function defineFilter<T>(filter: FilterQuery<T>): FilterQuery<T> {
   return filter;
 }
 
-export function defineSearchQuery<T>(query: SearchQuery<T>): SearchQuery<T> {
+export function defineQuery<T, Q extends SearchQuery<T>['order']>(query: Q): Q {
   return query;
 }
 
@@ -189,4 +195,8 @@ export function defineUpdateSet<T>(set: UpdateSet<T>): UpdateSet<T> {
 
 export function defineProjection<T>(p: FlattenPaths<T>[]): FlattenPaths<T>[] {
   return p;
+}
+
+export function defineInsertValue<T>(data: T): T {
+  return data;
 }

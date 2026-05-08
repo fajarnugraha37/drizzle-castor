@@ -42,7 +42,7 @@ export type Repository<
   // --- FACTORY METHODS (Type Isolation) ---
   defineFilter: (filter: FilterQuery<TEntity>) => FilterQuery<TEntity>;
   defineProjection: <P extends FlattenPaths<TEntity>[]>(p: P) => P;
-  defineQuery: <Q extends SearchQuery<TEntity>>(query: Q) => Q;
+  defineQuery: <Q extends SearchQuery<TEntity>['order']>(query: Q) => Q;
   defineUpdateSet: (set: UpdateSet<NonNullable<TInsert>>) => UpdateSet<NonNullable<TInsert>>;
   defineInsertValue: (data: TInsert) => TInsert;
 

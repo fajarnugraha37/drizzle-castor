@@ -29,12 +29,12 @@ export type GetTableMeta<
 
 // THE RECURSIVE ENTITY BUILDER ---
 // Merakit Base Table + Relasinya secara otomatis!
-// TDepth membatasi rekursi hingga kedalaman ke-3 agar TS compiler tidak meledak.
+// TDepth membatasi rekursi hingga kedalaman ke-5 agar TS compiler tidak meledak.
 export type InferEntity<
   TSchema extends { tables: readonly any[]; metadata: any },
   TTableName extends string,
   TDepth extends any[] = [],
-> = TDepth["length"] extends 3
+> = TDepth["length"] extends 5
   ? InferModel<FindTable<TSchema["tables"], TTableName>> // Limit tercapai, stop rekursi relasi
   : InferModel<FindTable<TSchema["tables"], TTableName>> & {
       // Base Columns (id, name, dll)
