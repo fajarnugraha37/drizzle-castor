@@ -43,7 +43,7 @@ export async function buildExistsCondition(
 ): Promise<SQL> {
   const { db, tables, metadata, baseTableName } = context;
   const pkName = (Object.keys(getTableColumns(baseTable)).find(k => (baseTable as any)[k].primary) || "id") as string;
-  const pkColumn = baseTable[pkName];
+  const pkColumn = (baseTable as any)[pkName];
 
   const subTableAliasName = `sub_${baseTableName}_correlate`;
   const subTable = aliasedTable(baseTable, subTableAliasName);
@@ -128,6 +128,9 @@ export async function buildSearchQueries<T>(
     baseTableName,
   );
 
+  const pkName = (Object.keys(getTableColumns(baseTable)).find(k => (baseTable as any)[k].primary) || "id") as string;
+  const pkColumn = (baseTable as any)[pkName];
+
   // Pre-resolve soft delete conditions for all tables to avoid returning a Promise of a QueryBuilder
   const resolvedSoftDelete: Record<string, { restore?: any, delete?: any }> = {};
   for (const table of tables) {
@@ -142,7 +145,7 @@ export async function buildSearchQueries<T>(
   }
 
   // 3. Build CTE Query Builder
-  let cteQb = db.select({ id: (baseTable as any).id }).from(baseTable);
+  let cteQb = db.select({ [pkName]: pkColumn }).from(baseTable);
   cteQb = applyJoins(
     cteQb,
     paths.ctePaths,
@@ -160,12 +163,12 @@ export async function buildSearchQueries<T>(
   }
 
   if (paths.needsGroupBy) {
-    cteQb = cteQb.groupBy((baseTable as any).id);
+    cteQb = cteQb.groupBy(pkColumn);
   } else {
     // Distinct is generally handled by GROUP BY when relations are involved,
     // but if no array relations are used in order, we can use distinct to prevent fan-out
     // Note: Some dialects have .distinct() builder method, otherwise group by PK is safer.
-    cteQb = cteQb.groupBy((baseTable as any).id);
+    cteQb = cteQb.groupBy(pkColumn);
   }
 
   const orderAst = parseOrder(query.order, baseTable, cteAliasMap, metadata, baseTableName, db);
@@ -183,7 +186,7 @@ export async function buildSearchQueries<T>(
   }
 
   // 4. Build Count Query (for pagination)
-  let countQb = db.select({ count: sql`count(distinct ${(baseTable as any).id})` }).from(baseTable);
+  let countQb = db.select({ count: sql`count(distinct ${pkColumn})` }).from(baseTable);
   countQb = applyJoins(
     countQb,
     paths.ctePaths,
@@ -203,8 +206,8 @@ export async function buildSearchQueries<T>(
   
   const selectionObj = buildSelection(query.projection as string[], baseTableName, baseTable, outerAliasMap, metadata, db);
   let mainQb = selectionObj 
-    ? db.with(sq).select(selectionObj).from(baseTable).innerJoin(sq, sql`${(baseTable as any).id} = ${sq}.id`)
-    : db.with(sq).select().from(baseTable).innerJoin(sq, sql`${(baseTable as any).id} = ${sq}.id`);
+    ? db.with(sq).select(selectionObj).from(baseTable).innerJoin(sq, sql`${pkColumn} = ${sq}.${sql.identifier(pkName)}`)
+    : db.with(sq).select().from(baseTable).innerJoin(sq, sql`${pkColumn} = ${sq}.${sql.identifier(pkName)}`);
 
   mainQb = applyJoins(
     mainQb,

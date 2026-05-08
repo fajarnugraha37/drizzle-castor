@@ -255,7 +255,15 @@ export function parseOrder(
     if (agg) {
       // Smart Aggregation fallback: MIN for asc, MAX for desc if agg is specifically requested
       const aggFunc = agg.toUpperCase();
-      // Use SQL template literal to force the aggregation function
+      
+      // SECURITY FIX: Whitelist aggregation functions to prevent SQL injection via sql.raw()
+      const allowedAggs = ["MAX", "MIN", "AVG", "SUM", "COUNT"];
+      if (!allowedAggs.includes(aggFunc)) {
+        throw new Error(`Invalid aggregation function: ${aggFunc}`);
+      }
+
+      // Use SQL template literal to force the aggregation function. 
+      // sql.raw is safe here because aggFunc is strictly whitelisted above.
       clauses.push(sql`${sql.raw(aggFunc)}(${col}) ${sortDir}${nullsSql}`);
     } else if (nullsPosition) {
       clauses.push(sql`${col} ${sortDir}${nullsSql}`);
