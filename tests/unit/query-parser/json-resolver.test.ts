@@ -1,14 +1,26 @@
-import { expect, test, describe } from "bun:test";
+import { expect, test, describe, mock } from "bun:test";
 import { buildJsonExtractionSql, parseUpdateSet } from "../../../src/query-parser/json-resolver";
 import { SecurityError, ColumnNotFoundError } from "../../../src/errors";
-import { sql } from "drizzle-orm";
+import { sql, getTableColumns } from "drizzle-orm";
+
+// Mock drizzle-orm's getTableColumns
+mock.module("drizzle-orm", () => {
+  const original = require("drizzle-orm");
+  return {
+    ...original,
+    getTableColumns: (table: any) => {
+      if (table && table._mockColumns) return table._mockColumns;
+      return original.getTableColumns(table);
+    }
+  };
+});
 
 describe("Query Parser: JSON Resolver", () => {
-  describe("buildJsonExtractionSql", () => {
-    const mockDbPg = { dialect: { constructor: { name: "PgDialect" } } };
-    const mockDbMySql = { dialect: { constructor: { name: "MySqlDialect" } } };
-    const mockDbSqlite = { dialect: { constructor: { name: "SQLiteDialect" } } };
+  const mockDbPg = { dialect: { constructor: { name: "PgDialect" } } };
+  const mockDbMySql = { dialect: { constructor: { name: "MySqlDialect" } } };
+  const mockDbSqlite = { dialect: { constructor: { name: "SQLiteDialect" } } };
 
+  describe("buildJsonExtractionSql", () => {
     test("Rejects invalid JSON paths", () => {
       expect(() => buildJsonExtractionSql(mockDbPg, sql`col`, "invalid;path")).toThrow(SecurityError);
       expect(() => buildJsonExtractionSql(mockDbPg, sql`col`, "path'--")).toThrow(SecurityError);
@@ -21,7 +33,6 @@ describe("Query Parser: JSON Resolver", () => {
 
     test("Generates correct SQL for PostgreSQL", () => {
       const result = buildJsonExtractionSql(mockDbPg, sql`col`, "profile.age");
-      // Result is a Drizzle SQL object. We can check its raw string query representation roughly
       expect(result).toBeDefined();
     });
 
@@ -37,29 +48,51 @@ describe("Query Parser: JSON Resolver", () => {
   });
 
   describe("parseUpdateSet", () => {
-    const mockDbPg = { dialect: { constructor: { name: "PgDialect" } } };
-    
-    const mockBaseTable = {
-      [Symbol.for("drizzle:Name")]: "users",
-      [Symbol.for("drizzle:Columns")]: {
-        name: sql`name`,
-        settings: sql`settings`
-      }
-    };
-    // Mock getTableColumns behavior manually for the test
-    const getTableColumnsMock = () => ({
+    const mockColumns = {
       name: sql`name`,
       settings: sql`settings`
-    });
-
-    // Note: To fully test parseUpdateSet, we'd need to mock getTableColumns from drizzle-orm
-    // Since bun:test allows mocking module exports, we can do it, but for a simple unit test,
-    // testing the security error and column not found error is crucial.
+    };
+    const mockBaseTable = {
+      _mockColumns: mockColumns,
+      [Symbol.for("drizzle:Name")]: "users"
+    };
 
     test("Throws SecurityError on invalid JSON path in setParams", () => {
       expect(() => {
          parseUpdateSet(mockDbPg, mockBaseTable, { "settings.in;valid": "hacked" });
       }).toThrow(SecurityError);
+    });
+
+    test("Throws ColumnNotFoundError for non-existent base column", () => {
+      expect(() => {
+        parseUpdateSet(mockDbPg, mockBaseTable, { "unknown.path": "val" });
+      }).toThrow(ColumnNotFoundError);
+    });
+
+    test("Correctly parses flat updates", () => {
+      const result = parseUpdateSet(mockDbPg, mockBaseTable, { name: "John" });
+      expect(result).toEqual({ name: "John" });
+    });
+
+    test("Parses JSON updates for PostgreSQL", () => {
+      const result = parseUpdateSet(mockDbPg, mockBaseTable, { "settings.theme": "dark", "settings.lang": "en" });
+      expect(result.settings).toBeDefined();
+    });
+
+    test("Parses JSON updates for MySQL", () => {
+      const result = parseUpdateSet(mockDbMySql, mockBaseTable, { "settings.theme": "dark" });
+      expect(result.settings).toBeDefined();
+    });
+
+    test("Parses JSON updates for SQLite", () => {
+      const result = parseUpdateSet(mockDbSqlite, mockBaseTable, { "settings.theme": "dark" });
+      expect(result.settings).toBeDefined();
+    });
+
+    test("Handles numeric indices in SQLite/MySQL paths", () => {
+      const result = parseUpdateSet(mockDbSqlite, mockBaseTable, { "settings.0.theme": "dark" });
+      expect(result.settings).toBeDefined();
+      // formatSqliteMysqlPath converts 0 to [0]
     });
   });
 });
