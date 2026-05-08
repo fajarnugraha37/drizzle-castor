@@ -1,6 +1,6 @@
 import "bun";
 import { faker } from "@faker-js/faker";
-import { db, isHasUsersData, listOfProfiles, schemaMetadata } from "../helper";
+import { db, isHasUsersData, listOfProfiles, schemaMetadata } from "./helper";
 
 export async function updateExample(args?: string[]) {
   const userRepo = schemaMetadata.repoFactory("users", {});

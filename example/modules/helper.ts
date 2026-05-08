@@ -1,7 +1,7 @@
 import { existsSync } from "fs";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { DefaultLogger, Logger } from "drizzle-orm";
-import { createSchemaBuilder } from "../dist";
+import { createSchemaBuilder } from "../../dist";
 import {
   commentsTable,
   companiesTable,
@@ -10,7 +10,7 @@ import {
   profilesTable,
   userGroups,
   usersTable,
-} from "./schema";
+} from "../schema";
 
 export function getDatabaseFileLocation(): string {
   for (const arg of ["../db.sqlite", "./db.sqlite", "./example/db.sqlite"]) {

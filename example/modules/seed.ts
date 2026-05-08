@@ -7,7 +7,7 @@ import {
   commentsTable,
   groupsTable,
   userGroups,
-} from "./schema";
+} from "../schema";
 import { db } from "./helper";
 
 export async function seed(args?: string[]) {

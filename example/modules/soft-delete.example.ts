@@ -1,5 +1,5 @@
 import "bun";
-import { db, isHasUsersData, listOfProfiles, schemaMetadata } from "../helper";
+import { db, isHasUsersData, listOfProfiles, schemaMetadata } from "./helper";
 import { faker } from "@faker-js/faker";
 
 export async function softDeleteExample(args?: string[]) {

@@ -1,5 +1,5 @@
 import "bun";
-import { seed } from "./seed";
+import { seed } from "./modules/seed";
 import { createExample } from "./modules/create.example";
 import { updateExample } from "./modules/update.example";
 import { readExample } from "./modules/read.example";
@@ -63,7 +63,7 @@ import { softDeleteExample } from "./modules/soft-delete.example";
   }
 }
 
-import { schemaMetadata } from "./helper";
+import { schemaMetadata } from "./modules/helper";
 
 async function playground() {
   console.log("--- BUG-2 Verification Playground ---");
