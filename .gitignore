@@ -40,3 +40,4 @@ db.sqlite-wal
 .secrets
 test-*.ts
 .bug-hunter/
+GEMINI.md
