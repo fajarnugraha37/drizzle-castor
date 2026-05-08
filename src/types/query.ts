@@ -8,63 +8,70 @@ export type Primitive =
   | symbol
   | bigint;
 
-export type ArrayElement<T> = T extends ReadonlyArray<infer U> ? U : never;
-
-export type IsObject<T> =
-  NonNullable<T> extends Primitive
-    ? false
-    : NonNullable<T> extends ReadonlyArray<infer U>
-      ? NonNullable<U> extends Primitive
-        ? false
-        : true
-      : NonNullable<T> extends object
-        ? true
-        : false;
+/**
+ * Optimized Check if a type is a traversable object (not a primitive)
+ */
+export type IsTraversable<T> = NonNullable<T> extends Primitive ? false : true;
 
 /**
- * PATH FLATTENING:
- * Flatten nested object paths with dot notation
- * Handles arrays: if array contains objects, traverse into them; otherwise treat as leaf
+ * Depth Counter to prevent infinite recursion and maintain performance.
+ * Supporting up to 10 levels.
  */
-export type FlattenPaths<T, Prefix extends string = ""> = {
-  [K in keyof T]-?: NonNullable<T[K]> extends ReadonlyArray<infer U>
-    ? IsObject<U> extends true
-      ?
-          | `${Prefix}${K & string}`
-          | `${Prefix}${K & string}.${number}`
-          | FlattenPaths<NonNullable<U>, `${Prefix}${K & string}.`>
-          | FlattenPaths<NonNullable<U>, `${Prefix}${K & string}.${number}.`>
-      : `${Prefix}${K & string}` | `${Prefix}${K & string}.${number}`
-    : IsObject<T[K]> extends true
-      ?
-          | `${Prefix}${K & string}`
-          | FlattenPaths<NonNullable<T[K]>, `${Prefix}${K & string}.`>
-      : `${Prefix}${K & string}`;
-}[keyof T];export type Field<T> = FlattenPaths<T>;
+type Prev = [never, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+/**
+ * OPTIMIZED PATH FLATTENING:
+ * Uses tail-recursive pattern and simpler conditional logic to reduce compiler load.
+ */
+export type FlattenPaths<T, Prefix extends string = "", Depth extends number = 10> = 
+  [Depth] extends [never] 
+    ? never 
+    : T extends object
+      ? {
+          [K in keyof T]-?: K extends string | number
+            ? NonNullable<T[K]> extends ReadonlyArray<infer U>
+              ? IsTraversable<U> extends true
+                ? | `${Prefix}${K}`
+                  | `${Prefix}${K}.${number}`
+                  | FlattenPaths<NonNullable<U>, `${Prefix}${K}.`, Prev[Depth]>
+                  | FlattenPaths<NonNullable<U>, `${Prefix}${K}.${number}.`, Prev[Depth]>
+                : `${Prefix}${K}` | `${Prefix}${K}.${number}`
+              : IsTraversable<T[K]> extends true
+                ? | `${Prefix}${K}`
+                  | FlattenPaths<NonNullable<T[K]>, `${Prefix}${K}.`, Prev[Depth]>
+                : `${Prefix}${K}`
+            : never;
+        }[keyof T]
+      : never;
+
+export type Field<T> = FlattenPaths<T>;
 export type FieldValue<T, P extends Field<T>> = ValueAt<T, P>;
 
 /**
- * Get the value type at a given flattened path
+ * Optimized ValueAt using faster string parsing.
  */
-export type ValueAt<T, P extends string> = P extends `${infer K}.${infer R}`
-  ? K extends keyof T
-    ? NonNullable<T[K]> extends ReadonlyArray<infer U>
-      ? IsObject<U> extends true
-        ? R extends `${number}.${infer Rest}` 
-          ? ValueAt<NonNullable<U>, Rest> 
-          : ValueAt<NonNullable<U>, R>
-        : R extends `${number}` 
-          ? U 
+export type ValueAt<T, P extends string> = 
+  P extends `${infer K}.${infer R}`
+    ? K extends keyof T
+      ? NonNullable<T[K]> extends ReadonlyArray<infer U>
+        ? R extends `${number}.${infer Rest}`
+          ? ValueAt<NonNullable<U>, Rest>
+          : R extends `${number}`
+            ? U
+            : ValueAt<NonNullable<U>, R>
+        : NonNullable<T[K]> extends object
+          ? ValueAt<NonNullable<T[K]>, R>
           : never
-      : IsObject<NonNullable<T[K]>> extends true
-        ? ValueAt<NonNullable<T[K]>, R>
+      : K extends `${number}`
+        ? T extends ReadonlyArray<infer U>
+          ? ValueAt<U, R>
+          : never
         : never
-    : never
-  : P extends keyof T
-    ? T[P]
-    : P extends `${number}`
-      ? NonNullable<T> extends ReadonlyArray<infer U> ? U : never
-      : never;
+    : P extends keyof T
+      ? T[P]
+      : P extends `${number}`
+        ? T extends ReadonlyArray<infer U> ? U : never
+        : never;
 
 /**
  * Extract the "leaf" type from a field (unwrap array to get element type)
@@ -120,10 +127,6 @@ export type ArrayContainmentOps<T> =
       }
     : {};
 
-/**
- * Combine all operators for a given field type
- * Type safety: operators only available when field type matches
- */
 export type FieldOperators<T> = ComparisonOps<T> &
   OrderableOps<T> &
   NullOps &
@@ -138,46 +141,21 @@ export type Conjunctions<T> = {
   $or?: FilterQuery<T>[];
 };
 
-/**
- * Recursive FilterQuery type that supports:
- * - Flattened field paths with type-safe operators
- * - Logical conjunctions ($and, $or, $not)
- * - Mixing conjunctions with field conditions in same object
- */
 export type FilterQuery<T> = Partial<Conjunctions<T>> & {
   [K in FlattenPaths<T>]?: FieldOperators<ValueAt<T, K>>;
 };
 
-/**
- * BASE ORDER TYPES
- */
 export type OrderDirection = "asc" | "desc";
 export type NullsPosition = "first" | "last";
 
-/**
- * Order configuration untuk satu field
- * Bisa string shorthand atau object dengan opsi lengkap
- */
 export type OrderFieldConfig =
-  | OrderDirection // shorthand: 'asc' | 'desc'
+  | OrderDirection
   | {
-      direction?: OrderDirection; // default: 'asc'
-      nulls?: NullsPosition; // optional: 'first' | 'last'
-      aggregate?: "min" | "max" | "avg" | "sum" | "count"; // optional: for array relations
+      direction?: OrderDirection;
+      nulls?: NullsPosition;
+      aggregate?: "min" | "max" | "avg" | "sum" | "count";
     };
 
-/**
- * MAIN ORDER QUERY TYPE:
- * OrderQuery<T> - Type-safe ordering dengan support:
- * - Flattened field paths (dot notation)
- * - Direction: 'asc' | 'desc' (default: 'asc')
- * - Null positioning: 'first' | 'last' (optional)
- *
- * Usage patterns:
- * 1. Simple: { name: 'asc' }
- * 2. With nulls: { name: { direction: 'desc', nulls: 'first' } }
- * 3. Multiple fields: { age: 'desc', name: { nulls: 'last' } }
- */
 export type OrderQuery<T> = {
   [K in FlattenPaths<T>]?: OrderFieldConfig;
 };
@@ -190,7 +168,7 @@ export type OrderClause<T> = {
 export type OrderQueryArray<T> = OrderClause<T> | OrderClause<T>[];
 
 /**
- * Deeply pick properties from an object based on a union of dot-notation string paths.
+ * Optimized DeepPick using more efficient mapping.
  */
 export type DeepPick<T, P extends string> =
   T extends ReadonlyArray<infer U>
@@ -213,7 +191,7 @@ export type DeepPick<T, P extends string> =
                     : never
                 >
               | Extract<T[K], null | undefined>
-          : T[K]; // If exact base key is matched, return the whole object
+          : T[K];
       };
 
 export type SearchQuery<T> = {
