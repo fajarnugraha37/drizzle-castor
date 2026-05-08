@@ -5,7 +5,7 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany, executeRestoreOne, executeRestoreMany } from "./mutations/soft-delete";
 import { getTableName } from "drizzle-orm";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
-import { composeMiddleware, createRbacMiddleware, createHooksMiddleware } from "./middleware/exports";
+import { composeMiddleware, createFieldRbacMiddleware, createHooksMiddleware } from "./middleware/exports";
 import type { Middleware, MiddlewareContext } from "./middleware/index";
 
 export function defineSchemaMetadata<
@@ -15,7 +15,8 @@ export function defineSchemaMetadata<
   db: TDb, 
   tables: TTables, 
   mode: "strict" | "lenient" = "lenient",
-  globalMiddlewares: Middleware[] = []
+  globalMiddlewares: Middleware[] = [],
+  isThrowError: boolean = false
 ) {
   if (mode === "lenient") {
     console.warn(
@@ -23,7 +24,6 @@ export function defineSchemaMetadata<
     );
   }
 
-  const rbacMiddleware = createRbacMiddleware(mode);
   const hooksMiddleware = createHooksMiddleware();
 
   return function <const TMetadata extends TSchemaMetadata<TDb, TTables>>(
@@ -49,8 +49,10 @@ export function defineSchemaMetadata<
 
       const tableConfig = (metadata as any)[tableName] || {};
       const tableMiddlewares = tableConfig.middlewares || [];
+      
+      const rbacMiddleware = createFieldRbacMiddleware(options as any, mode, isThrowError);
 
-      // Stack: Global -> Table Specific -> Hooks -> RBAC -> Core Action
+      // Stack: Global -> Table Specific -> Hooks -> Field RBAC -> Core Action
       const pipeline = composeMiddleware([
         ...globalMiddlewares,
         ...tableMiddlewares,

@@ -63,12 +63,13 @@ export async function readExample(args?: string[]) {
       );
       console.log(
         `\x1b[32m[READ][SUCCESS] Read many users with profile ${JSON.stringify(profile)}:\x1b[0m`,
-        readManyResult.map((u) => ({
-          id: u.id,
-          deletedFlag: u.deletedFlag,
-          deletedAt: u.deletedAt,
-          deletedBy: u.deletedBy,
-        })),
+        readManyResult.length,
+        // readManyResult.map((u) => ({
+        //   id: u.id,
+        //   deletedFlag: u.deletedFlag,
+        //   deletedAt: u.deletedAt,
+        //   deletedBy: u.deletedBy,
+        // })),
       );
     } catch (err: any) {
       console.error(
@@ -93,12 +94,13 @@ export async function readExample(args?: string[]) {
       );
       console.log(
         `\x1b[32m[READ][SUCCESS] Read page of users with profile ${JSON.stringify(profile)}:\x1b[0m`,
-        pageResult.data.map((u) => ({
-          id: u.id,
-          deletedFlag: u.deletedFlag,
-          deletedAt: u.deletedAt,
-          deletedBy: u.deletedBy,
-        })),
+        pageResult.data.length,
+        // pageResult.data.map((u) => ({
+        //   id: u.id,
+        //   deletedFlag: u.deletedFlag,
+        //   deletedAt: u.deletedAt,
+        //   deletedBy: u.deletedBy,
+        // })),
       );
     } catch (err: any) {
       console.error(
@@ -163,12 +165,13 @@ export async function readExample(args?: string[]) {
       );
       console.log(
         `\x1b[32m[READ][SUCCESS] Read deleted many users with profile ${JSON.stringify(profile)}:\x1b[0m`,
-        readDeletedManyResult.map((u) => ({
-          id: u.id,
-          deletedFlag: u.deletedFlag,
-          deletedAt: u.deletedAt,
-          deletedBy: u.deletedBy,
-        })),
+        readDeletedManyResult.length,
+        // readDeletedManyResult.map((u) => ({
+        //   id: u.id,
+        //   deletedFlag: u.deletedFlag,
+        //   deletedAt: u.deletedAt,
+        //   deletedBy: u.deletedBy,
+        // })),
       );
     } catch (err: any) {
       console.error(
@@ -194,12 +197,13 @@ export async function readExample(args?: string[]) {
       );
       console.log(
         `\x1b[32m[READ][SUCCESS] Read deleted page of users with profile ${JSON.stringify(profile)}:\x1b[0m`,
-        readDeletedPageResult.data.map((u) => ({
-          id: u.id,
-          deletedFlag: u.deletedFlag,
-          deletedAt: u.deletedAt,
-          deletedBy: u.deletedBy,
-        })),
+        readDeletedPageResult.data.length,
+        // readDeletedPageResult.data.map((u) => ({
+        //   id: u.id,
+        //   deletedFlag: u.deletedFlag,
+        //   deletedAt: u.deletedAt,
+        //   deletedBy: u.deletedBy,
+        // })),
       );
     } catch (err: any) {
       console.error(

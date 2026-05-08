@@ -8,6 +8,7 @@ export class SchemaBuilder<
   TMetadata extends Record<string, any> = {},
 > {
   private globalMiddlewares: Middleware[] = [];
+  private isThrowError: boolean = false;
 
   constructor(
     private db: TDb,
@@ -18,6 +19,11 @@ export class SchemaBuilder<
 
   use(middleware: Middleware): this {
     this.globalMiddlewares.push(middleware);
+    return this;
+  }
+
+  withThrowError(val: boolean): this {
+    this.isThrowError = val;
     return this;
   }
 
@@ -36,12 +42,13 @@ export class SchemaBuilder<
       metadataWithNewTable as any,
     );
     newBuilder.globalMiddlewares = [...this.globalMiddlewares];
+    newBuilder.isThrowError = this.isThrowError;
     return newBuilder;
   }
 
   build() {
     const finalMetadata = this.metadata as unknown as TMetadata;
-    return defineSchemaMetadata(this.db, this.tables, this.mode, this.globalMiddlewares)(finalMetadata);
+    return defineSchemaMetadata(this.db, this.tables, this.mode, this.globalMiddlewares, this.isThrowError)(finalMetadata);
   }
 }
 
