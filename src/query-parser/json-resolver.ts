@@ -1,4 +1,4 @@
-import { SQL, sql } from "drizzle-orm";
+import { SQL, sql, getTableColumns } from "drizzle-orm";
 import { getTableName } from "drizzle-orm";
 
 /**
@@ -59,7 +59,8 @@ export function parseUpdateSet(
 ): Record<string, any> {
   const dialectName = (db as any).dialect?.constructor?.name || "";
   const parsedSet: Record<string, any> = {};
-  const jsonMutations: Record<string, { path: string; value: any }[]> = {};
+  const jsonMutations: Record<string, { path: string; value: any }[]> = Object.create(null);
+  const tableColumns = getTableColumns(baseTable);
 
   for (const [key, value] of Object.entries(setParams)) {
     const dotIndex = key.indexOf(".");
@@ -70,7 +71,7 @@ export function parseUpdateSet(
       // Security check for update keys
       validateJsonPath(jsonPath);
 
-      if (!baseTable[columnName]) {
+      if (!Object.prototype.hasOwnProperty.call(tableColumns, columnName)) {
          throw new Error(`Column '${columnName}' not found on table '${getTableName(baseTable)}'`);
       }
 
@@ -84,7 +85,7 @@ export function parseUpdateSet(
   }
 
   for (const [columnName, mutations] of Object.entries(jsonMutations)) {
-    const rawColumn = baseTable[columnName];
+    const rawColumn = tableColumns[columnName];
     let mutationSql: SQL = rawColumn;
 
     if (dialectName.startsWith("Pg")) {

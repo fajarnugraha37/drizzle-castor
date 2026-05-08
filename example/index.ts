@@ -81,6 +81,20 @@ async function playground() {
   });
   console.log("User with highest age:", users);
 
+  console.log("\n--- Testing BUG-3: Unvalidated JSON Key Access ---");
+  try {
+    // Attempting to update a prototype property, which should be rejected
+    await userRepo.updateOne(users!.id, { "toString.path": "hacked" } as any, "admin");
+    console.error("❌ FAIL: BUG-3 is NOT fixed. Query passed validation and executed.");
+  } catch (error: any) {
+    if (error.message.includes("Column 'toString' not found")) {
+      console.log("✅ PASS: BUG-3 is fixed. Caught invalid column successfully with message:", error.message);
+    } else {
+      console.error("❌ FAIL: Unexpected error occurred:", error.message);
+    }
+  }
+  console.log("--------------------------------------------------\n");
+
   // // 1. Check data from database (seeded with numeric strings)
   // const users = await userRepo.searchPage({
   //   pageSize: 5,
