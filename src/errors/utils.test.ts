@@ -89,9 +89,9 @@ describe("Error Utilities", () => {
       expect(isQueryError(err)).toBe(true);
     });
 
-    test('Identifies MutationError as QueryError when code is "MUTATION_ERROR"', () => {
+    test('Identifies MutationError when code is "MUTATION_ERROR"', () => {
       const err = new MutationError("test", "test mutation error");
-      expect(isQueryError(err)).toBe(true);
+      expect(isCastorError(err)).toBe(true);
       expect(err.code).toBe("MUTATION_ERROR");
     });
 
@@ -101,7 +101,7 @@ describe("Error Utilities", () => {
     });
 
     test("Identifies bundled objects mimicking QueryError with different code (duck typing)", () => {
-      const fakeErr = { name: "MockError", code: "SOME_OTHER_ERROR", message: "msg" };
+      const fakeErr = { name: "MockError", code: "TABLE_NOT_FOUND", message: "msg" };
       expect(isQueryError(fakeErr)).toBe(true);
     });
 
