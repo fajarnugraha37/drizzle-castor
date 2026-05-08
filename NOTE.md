@@ -1,57 +1,92 @@
-# Notes: TypeScript
+# Architecture Guide: Advanced TypeScript Type System
 
-This library relies heavily on advanced features of the TypeScript Type System. Static type manipulation is used to achieve Extreme Type Safety and Inference on database relations (Relational API) and JSON types (NoSQL-like filtering).
+This document serves as the technical blueprint and handover manual for the type inference engine. The system is designed to achieve extreme type safety for relational database structures and nested JSON types while maintaining high performance for IDE IntelliSense and build times.
 
-Here are some critical guidelines, notes, and warnings to keep in mind when modifying or extending the core engine of this system:
+## 1. Type Isolation via the Factory Pattern
+The core engine follows an "Inference on Demand" strategy to prevent the compiler from becoming overwhelmed by large schemas.
 
-## 1. Understand "Type Widening" and How to Prevent It
-The most common problem when building a Builder Pattern or Factory Function in TypeScript is the loss of literal types (Literal Type Erasure / Type Widening).
-* **Case:** When a developer defines a relation `relationName: "profile"`, TypeScript often infers the data type to be just a plain `string`, not the literal value `"profile"`.
-* **Impact:** If TypeScript reads `"profile"` as a `string`, our type utilities (like `InferEntity` or `FlattenPaths`) won't know the exact name of the relationship. This breaks autocomplete and type-checking altogether.
-* **Golden Solution:** Use a generic `const` parameter.
+- **Objective:** Prevent the compiler from re-evaluating the entire table relationship tree for every repository method.
+- **Pattern:** Heavily recursive logic is moved into isolated "Define" functions.
+- **Methods:** `defineProjection`, `defineFilter`, `defineQuery`, `defineUpdateSet`, and `defineInsertValue`.
+- **Recommendation:** Always encourage developers to use these helpers for complex or deep nested queries. They act as "Inference Firewalls."
+
+## 2. Recursive Depth Management
+Recursive types are controlled via tail-recursive counters to prevent "excessively deep instantiation" errors.
+
+- **Object Tree (InferEntity):** Capped at 10 levels. This manages the structural relationship between tables.
+- **String Unions (FlattenPaths):** Capped at 5 levels. String operations are significantly more memory-intensive; strict capping ensures the literal pool remains manageable.
+- **Counter Pattern:**
 ```typescript
-// WRONG (Type Widening Affects)
-table<TConfig extends TableConfig<...>>(config: TConfig)
-
-// TRUE (Preserves String Literals)
-table<const TConfig extends TableConfig<...>>(config: TConfig)
+type Prev = [never, 0, 1, 2, 3, 4, 5];
+type RecursiveType<T, Depth extends number = 5> = [Depth] extends [never]
+  ? never
+  : { [K in keyof T]: RecursiveType<T[K], Prev[Depth]> };
 ```
 
-## 2. Recursion Depth Limit
-TypeScript has a hard limit on how deep a type can be evaluated recursively (for example, when building a table tree). If you let it run indefinitely, the TypeScript compiler will throw an error: "Type instantiation is excessively deep and possibly infinite," and your VS Code will become very slow.
-* Rule: Always use the array tuple `TDepth extends any[] = []` as a counter to stop the recursion at a certain depth (usually 3 or 4 levels is sufficient for database relations).
-* Example in `helper.d.ts` (`InferEntity`):
+## 3. Optimized Path Resolution (ValueAt)
+Path resolution uses a Key-First Lookup strategy to minimize string parsing overhead.
+
+- **Strategy:** Direct property lookup (`T[K]`) is tried first. The compiler only proceeds to template literal splitting (`${infer K}.${infer R}`) if the direct lookup fails.
+- **Benefit:** Reduces the number of recursive jumps the compiler must take when validating paths like `a.b.c.d.e`.
+
+## 4. Relationship Directionality and Constraints
+Type constraints must strictly mirror SQL foreign key logic.
+
+- **oneToMany:** `localKey` (Parent) -> `foreignKey` (Child).
+- **manyToOne:** `localKey` (Child) -> `foreignKey` (Parent).
+- **Type Widening Prevention:** Use the `const` parameter pattern in builder methods to preserve string literals.
 ```typescript
-export type InferEntity<
-TSchema, TTableName, TDepth extends any[] = []
-> = TDepth["length"] extends 3
-? InferModel<FindTable<TSchema["tables"], TTableName>> // Stop at depth 3
-: InferModel<...> & { /* Continue relation inferring */ }
+// Prevents "users" from being widened to just "string"
+function table<const T extends TableConfig>(config: T)
 ```
 
-## 3. Strict Array Type Inference (`NonNullable`)
-Drizzle ORM returns properties that can hold `null` values ​​(e.g., `string[] | null`). When attempting to extract the type of a single element from an array using the `infer` keyword, a union type (such as Nullable) will block the inference process and return the type `never`.
-* **Impact:** Operators such as `$in` or `$arrayContains` will break and reject all input provided by the developer.
-* **Solution:** Always wrap your inference target with `NonNullable<T>` before checking if it is an array.
-* **Example in `query.ts` (`LeafType`):**
-```typescript
-// WRONG
-export type LeafType<T> = T extends ReadonlyArray<infer U> ? U : T;
+## 5. Intrinsic Safety and Nullability
+Database schemas often return nullable columns which block the `infer` keyword.
 
-// TRUE
-export type LeafType<T> = NonNullable<T> extends ReadonlyArray<infer U> ? NonNullable<U> : NonNullable<T>;
+- **The Guard:** Always wrap inference targets in `NonNullable<T>` before attempting to extract types.
+```typescript
+// Correct pattern for array element inference
+export type LeafType<T> = NonNullable<T> extends ReadonlyArray<infer U> 
+  ? NonNullable<U> 
+  : NonNullable<T>;
 ```
 
-## 4. Type Constraints Must Be Explicit & Precise
-Ensure that the relationship structure at the type level (`schema-metadata.d.ts`) exactly matches the structure rules at the SQL level (Database Schema).
-* **manyToOne vs oneToMany:**
-- In `oneToMany`: `localKey` (e.g., `users.id`) is in the parent table, and `foreignKey` (`posts.userId`) is in the related child table.
-- In `manyToOne`: It's the other way around! `localKey` (`comments.postId`) is in the current table, and `foreignKey` (`posts.id`) is in the related table.
-* **Typing Error:** If the type constraint (`StrictRelations`) forces the wrong orientation, the developer will be forced to write the configuration upside down. Even though TypeScript doesn't complain, our AST Compiler in runtime (`ast-compiler.ts`) will read those keys and construct the wrong/upside-down SQL `LEFT JOIN`.
+## 6. Autocomplete Preservation Trick
+To allow arbitrary string keys while prioritizing suggestions for known literals (e.g., Profile Names), use the `(string & {})` intersection trick.
 
-## 5. Maintain "In-Memory Type Parsing" Through Generics
-* Avoid aggressive casting like `as any` in your type architecture internally, unless there is absolutely no way around it (and even then only at the runtime execution level).
-* Builder patterns like `SchemaBuilder` accumulate types using *intersection* (`TMetadata & { [K in TName]: TConfig }`). Make sure the final executer function (`.build()`) explicitly forces TypeScript to return the full union/intersection of that accumulation so that methods like `repoFactory` know exactly what the entire schema has been assembled with.
+- **Concept:** `(string & {})` prevents literal types (like 'admin') from being merged into a generic `string` type during union reduction.
+```typescript
+type ProfileNames = 'admin' | 'public' | (string & {}); // Suggests admin/public first
+```
 
-## 6. Dynamic Projection (`DeepPick`)
-The type returned by a *repository* MUST ONLY contain properties explicitly requested by the *developer* via parameters.
+## 7. Dynamic Result Shaping (DeepPick)
+The `DeepPick` utility transforms the "Full Entity" type into a "Partial Entity" based on a runtime projection array.
+
+- **Mechanism:** It recursively filters object properties against the union of strings provided in the projection. 
+- **Optimization:** It uses a mapped type with a conditional `as` clause to filter out keys that do not match the requested path.
+
+## 8. Metaprogramming Tips and Tricks
+
+### A. Template Literal Path Stripping
+When traversing a path like `user.profile.bio`, use recursive inference to strip the head:
+```typescript
+type Tail<P extends string> = P extends `${string}.${infer Rest}` ? Rest : never;
+```
+
+### B. Readonly-Aware Inference
+Always prefer `ReadonlyArray<infer U>` over `Array<infer U>`. Modern TypeScript development uses `as const` assertions frequently, which produce `readonly` arrays. Standard `Array` inference will fail on these.
+
+### C. Intersection Merging (Clean Output)
+Builder patterns accumulate types using intersections (`A & B & C`). To make the IDE show a single merged object instead of a messy intersection, use a "Prettify" or "Expand" utility:
+```typescript
+type Expand<T> = T extends object ? { [K in keyof T]: T[K] } : T;
+```
+
+### D. Distributed Conditional Types
+Be aware that `T extends any` will distribute the operation across a union. Use `[T] extends [any]` to disable distribution when you need to treat a union as a single unit.
+
+## 9. Performance Auditing
+If the IDE becomes slow:
+1. Reduce the `FlattenPaths` depth from 5 to 4 or 3.
+2. Check if a new table has an extremely large number of columns or complex JSON types.
+3. Ensure no circular relations are missing the depth counter.
