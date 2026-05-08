@@ -76,6 +76,22 @@ export async function seed(args?: string[]) {
               faker.number.int({ min: 1, max: 4 }),
             ),
           },
+          settings: {
+            theme: faker.helpers.arrayElement(["light", "dark"]),
+            notifications: faker.datatype.boolean(),
+            occasionally: {
+              randomValue: faker.number.float(),
+              oldValue: faker.string.alphanumeric(10),
+            },
+          },
+          occupational: {
+            company: randomCompany.name,
+            position: faker.person.jobTitle(),
+            period: {
+              start: faker.date.past(),
+              end: faker.date.future(),
+            },
+          },
           companyId: randomCompany.id,
           zipCode: faker.location.zipCode(),
           stringId: faker.string.numeric(5),
