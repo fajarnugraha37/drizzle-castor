@@ -72,8 +72,8 @@ async function playground() {
 
   const userRepo = builder.repoFactory("users", {
     default: {
-      allowedProjections: ["*"],
-      allowedFilters: ["*"],
+      allowedProjections: ['name', 'persona.skills', 'settings.theme', 'occupational.period.start', 'posts.title', 'posts.comments.content'],
+      allowedFilters: ['occupational.company', 'persona.skills', 'settings.theme'],
       allowedSets: ["*"],
       allowedSorts: ["*"],
     },
@@ -109,7 +109,7 @@ async function playground() {
       filter: {
         "toString": { $eq: "1" }
       }
-    } as any);
+    } as any, "admin");
     console.error("❌ FAILED: The unvalidated key access did not throw an error.");
   } catch (error: any) {
     if (isQueryError(error) && error.message.includes("not found on table")) {
@@ -124,7 +124,7 @@ async function playground() {
       filter: {
         "hasOwnProperty": { $eq: "1" }
       }
-    } as any);
+    } as any, "admin");
     console.error("❌ FAILED: The unvalidated key access did not throw an error.");
   } catch (error: any) {
     if (isQueryError(error) && error.message.includes("not found on table")) {
@@ -136,8 +136,13 @@ async function playground() {
 
   console.log("\n--- Testing RBAC Custom Errors ---");
   try {
-    // Calling with a non-existent profile
-    await userRepo.searchMany({}, "hacker_profile" as any);
+    // Calling with a non-existent profile in strict mode
+    const strictBuilder = (await import("../src/schema-metadata-builder")).createSchemaBuilder(builder.db, builder.tables, "strict");
+    const strictMeta = strictBuilder.build();
+    const strictRepo = strictMeta.repoFactory("users", {
+      default: { allowedProjections: ["*"] }
+    });
+    await strictRepo.searchMany({}, "hacker_profile" as any);
     console.error("❌ FAILED: The unvalidated profile did not throw an error.");
   } catch (error: any) {
     if (isSecurityError(error) && error.code === "ACCESS_DENIED") {
@@ -163,6 +168,24 @@ async function playground() {
     },
   });
   console.log("JSON Array Extraction Result:", JSON.stringify(jsonArrayResult, null, 2));
+
+  console.log("\n--- Testing RBAC Trimming ---");
+  const trimmedRepo = builder.repoFactory("users", {
+    public: {
+      allowedFilters: ["name", "email"],
+      allowedProjections: ["name"],
+    }
+  });
+
+  const trimmedQuery = await trimmedRepo.searchMany({
+    projection: ["name", "persona"],
+    filter: {
+      "name": { $eq: "John" },
+      "persona.skills": { $isNull: true }
+    }
+  } as any, "public");
+
+  console.log("Trimmed Query Executed.");
 
   console.log("\n--- Playground Test Finished ---");
 }
