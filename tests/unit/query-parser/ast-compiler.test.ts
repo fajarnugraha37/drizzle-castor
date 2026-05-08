@@ -1,3 +1,4 @@
+// @ts-nocheck 
 import { expect, test, describe, mock } from "bun:test";
 import { buildSelection, parseFilter, parseOrder, applyJoins } from "../../../src/query-parser/ast-compiler";
 import { SecurityError, AliasNotFoundError, TableNotFoundError, ColumnNotFoundError } from "../../../src/errors";
