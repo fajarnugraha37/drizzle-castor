@@ -44,8 +44,15 @@ import { softDeleteExample } from "./modules/soft-delete.example";
           console.log("> Running main function with hard-delete subcommand...");
           await hardDeleteExample(process.argv.splice(3));
           break;
+        case "-p":
+        case "--playground":
+          console.log("> Running main function with playground subcommand...");
+          await playground();
+          break;
         default:
-          console.log("> Running main function with no specific subcommand...");
+          console.log(
+            "> No valid subcommand provided for --main. Use -c/--create, -r/--read, -u/--update, -sd/--soft-delete, -hd/--hard-delete, or -p/--playground.",
+          );
           break;
       }
       break;
@@ -55,4 +62,10 @@ import { softDeleteExample } from "./modules/soft-delete.example";
       );
       break;
   }
+}
+
+async function playground() {
+  // You can add any ad-hoc testing code here to quickly test things out without affecting the main example functions.
+  // For instance, you could directly call repository methods, test out new query patterns, etc.
+  // This is a great place for quick experiments and debugging.
 }
