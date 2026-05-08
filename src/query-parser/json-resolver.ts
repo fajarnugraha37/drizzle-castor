@@ -48,10 +48,12 @@ export function buildJsonExtractionSql(
     const pgPath = `{${jsonPath.replace(/\./g, ",")}}`;
     return sql`${column}#>${pgPath}`;
   } else if (dialectName.startsWith("MySql")) {
-    const myPath = `$.${jsonPath}`;
+    const formattedPath = formatSqliteMysqlPath(jsonPath);
+    const myPath = `$.${formattedPath}`;
     return sql`JSON_EXTRACT(${column}, ${myPath})`;
   } else {
-    const litePath = `$.${jsonPath}`;
+    const formattedPath = formatSqliteMysqlPath(jsonPath);
+    const litePath = `$.${formattedPath}`;
     return sql`json_extract(${column}, ${litePath})`;
   }
 }

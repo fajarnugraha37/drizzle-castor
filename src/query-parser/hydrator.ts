@@ -28,7 +28,12 @@ function unflattenAndParseJson(obj: any): any {
         const part = parts[i]!;
         assertSafeKey(part, "hydration");
         if (!current[part]) {
-          current[part] = Object.create(null);
+          const nextPart = parts[i + 1]!;
+          if (!isNaN(Number(nextPart))) {
+            current[part] = [];
+          } else {
+            current[part] = Object.create(null);
+          }
         }
         current = current[part];
       }

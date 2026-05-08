@@ -47,12 +47,10 @@ export type ValueAt<T, P extends string> = P extends keyof T
     ? K extends keyof T
       ? ValueAt<LeafType<T[K]>, R>
       : K extends `${number}`
-        ? T extends ReadonlyArray<infer U>
-          ? ValueAt<U, R>
-          : never
+        ? ValueAt<T, R>
         : never
     : P extends `${number}`
-      ? T extends ReadonlyArray<infer U> ? U : never
+      ? T
       : never;
 
 export type LeafType<T> =
