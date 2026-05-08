@@ -1,3 +1,5 @@
+import { QueryParsingError } from "../errors";
+
 export type RelationType =
   | "oneToMany"
   | "manyToMany"
@@ -109,7 +111,7 @@ export function resolveRelationPath(
 ): RelationNode[] {
   const resolution = resolvePathSegments(metadata, baseTableName, path);
   if (resolution.jsonPath) {
-    throw new Error(`Path '${path}' contains non-relational segment '${resolution.jsonPath.split('.')[0]}'`);
+    throw new QueryParsingError(`Path '${path}' contains non-relational segment '${resolution.jsonPath.split('.')[0]}'`);
   }
   return resolution.nodes;
 }

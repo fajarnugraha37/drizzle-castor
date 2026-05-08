@@ -5,6 +5,7 @@ import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
 import { buildJsonExtractionSql } from "./json-resolver";
 import type { AnyDatabase } from "../types";
+import { AliasNotFoundError, SecurityError, TableNotFoundError } from "../errors";
 
 /**
  * Builds a specific selection object for Drizzle to only select requested columns.
@@ -102,7 +103,7 @@ export function applyJoins(
           : aliasMap.get(path.substring(0, lastDotIndex));
 
       if (!parentTable) {
-        throw new Error(`Parent table alias not found for path '${path}'`);
+        throw new AliasNotFoundError(`Parent table alias not found for path '${path}'`);
       }
 
       let softDeleteConditions: SQL | undefined = undefined;
@@ -135,7 +136,7 @@ export function applyJoins(
 
         if (joinTableName && localColumnName && joinLocalColumnName && relatedColumnName && joinRelatedColumnName) {
            const joinTableObj = tables.find(t => getTableName(t) === joinTableName);
-           if (!joinTableObj) throw new Error(`Join table ${joinTableName} not found`);
+           if (!joinTableObj) throw new TableNotFoundError(`Join table ${joinTableName} not found`);
            
            const joinTableAlias = aliasedTable(joinTableObj, `rel_${path.replace(/\./g, "_")}_bridge`);
            
@@ -259,7 +260,7 @@ export function parseOrder(
       // SECURITY FIX: Whitelist aggregation functions to prevent SQL injection via sql.raw()
       const allowedAggs = ["MAX", "MIN", "AVG", "SUM", "COUNT"];
       if (!allowedAggs.includes(aggFunc)) {
-        throw new Error(`Invalid aggregation function: ${aggFunc}`);
+        throw new SecurityError(`Invalid aggregation function: ${aggFunc}`);
       }
 
       // Use SQL template literal to force the aggregation function. 

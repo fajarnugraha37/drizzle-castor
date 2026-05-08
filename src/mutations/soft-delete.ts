@@ -1,11 +1,12 @@
 import { buildSearchQueries, hydrateResults, parseUpdateSet, resolveProviderValues, isFilterSimple, parseFilter, injectSoftDeleteFilter, buildExistsCondition, type TranslatorContext } from "../query-parser";
 import type { DbAction, SoftDeleteConfig } from "../types";
 import { getPrimaryKeyColumnName } from "./create";
+import { ConfigurationError } from "../errors";
 
 function getSoftDeleteConfig(metadata: any, tableName: string): SoftDeleteConfig<any> {
   const config = metadata[tableName]?.softDelete;
   if (!config) {
-    throw new Error(`Soft delete is not configured for table '${tableName}'`);
+    throw new ConfigurationError(`Soft delete is not configured for table '${tableName}'`);
   }
   return config;
 }

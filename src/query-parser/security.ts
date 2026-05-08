@@ -1,3 +1,5 @@
+import { SecurityError } from "../errors";
+
 /**
  * Asserts that a given key is not a dangerous prototype property.
  * Used to prevent Prototype Pollution vulnerabilities.
@@ -7,6 +9,6 @@
  */
 export function assertSafeKey(key: string, context: string): void {
   if (key === "__proto__" || key === "constructor" || key === "prototype") {
-    throw new Error(`Security Error: Illegal key '${key}' in ${context}`);
+    throw new SecurityError(`Security Error: Illegal key '${key}' in ${context}`);
   }
 }

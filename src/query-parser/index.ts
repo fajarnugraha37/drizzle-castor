@@ -14,6 +14,7 @@ import { buildAliases } from "./alias-manager";
 import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compiler";
 import { resolveProviderValues } from "./soft-delete-helper";
 import type { AnyTable, SearchQuery } from "../types";
+import { TableNotFoundError } from "../errors";
 
 export type TranslatorContext = {
   db: any;
@@ -108,7 +109,7 @@ export async function buildSearchQueries<T>(
 
   const baseTable = tables.find((t) => getTableName(t) === baseTableName);
   if (!baseTable) {
-    throw new Error(`Base table '${baseTableName}' not found.`);
+    throw new TableNotFoundError(`Base table '${baseTableName}' not found.`);
   }
 
   // 1. Analyze paths

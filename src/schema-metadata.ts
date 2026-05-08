@@ -5,6 +5,7 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany, executeRestoreOne, executeRestoreMany } from "./mutations/soft-delete";
 import { getTableName } from "drizzle-orm";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
+import { AccessDeniedError } from "./errors";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
@@ -49,7 +50,7 @@ export function defineSchemaMetadata<
           Object.keys(tableConfig.profiles).length === 0
         ) {
           if (mode === "lenient") return; // Allow by default in lenient mode
-          throw new Error(
+          throw new AccessDeniedError(
             `[Access Denied] Table '${tableName}' has no profiles defined in strict mode.`,
           );
         }
@@ -82,11 +83,11 @@ export function defineSchemaMetadata<
         if (!hasAccess) {
           const profileStr = profilesToCheck.join(", ");
           if (missingProfiles.length === profilesToCheck.length) {
-            throw new Error(
+            throw new AccessDeniedError(
               `[Access Denied] None of the profiles '${profileStr}' are defined for table '${tableName}'.`,
             );
           }
-          throw new Error(
+          throw new AccessDeniedError(
             `[Access Denied] Action '${action}' is denied for profiles '${profileStr}' on table '${tableName}'.`,
           );
         }

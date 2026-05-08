@@ -1,6 +1,7 @@
 import { getTableColumns } from "drizzle-orm";
 import { buildSearchQueries, hydrateResults, type TranslatorContext } from "../query-parser";
 import type { DbAction } from "../types";
+import { MutationError } from "../errors";
 
 /**
  * Extracts the primary key column name from a Drizzle table.
@@ -36,7 +37,7 @@ export async function executeCreateOne(
   const insertResult = await db.insert(baseTable).values(data).returning();
   
   if (!insertResult || insertResult.length === 0) {
-    throw new Error(`Failed to insert record into table '${baseTableName}'`);
+    throw new MutationError(`Failed to insert record into table '${baseTableName}'`);
   }
   
   const pkName = getPrimaryKeyColumnName(baseTable);
@@ -84,7 +85,7 @@ export async function executeCreateMany(
   const insertResult = await db.insert(baseTable).values(data).returning();
   
   if (!insertResult || insertResult.length === 0) {
-    throw new Error(`Failed to insert records into table '${baseTableName}'`);
+    throw new MutationError(`Failed to insert records into table '${baseTableName}'`);
   }
   
   const pkName = getPrimaryKeyColumnName(baseTable);

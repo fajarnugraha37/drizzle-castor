@@ -1,6 +1,7 @@
 import { SQL, sql, getTableColumns } from "drizzle-orm";
 import { getTableName } from "drizzle-orm";
 import { assertSafeKey } from "./security";
+import { ColumnNotFoundError, SecurityError } from "../errors";
 
 /**
  * Validates a JSON path segment for safety against SQL Injection.
@@ -10,7 +11,7 @@ function validateJsonPath(path: string): void {
   // Allowlist: letters, numbers, underscores, dots, and square brackets for arrays
   const safePattern = /^[a-zA-Z0-9_.[\]]+$/;
   if (!safePattern.test(path)) {
-    throw new Error(`Security Error: Invalid characters in JSON path: "${path}"`);
+    throw new SecurityError(`Security Error: Invalid characters in JSON path: "${path}"`);
   }
   
   // Explicitly block prototype pollution vectors
@@ -79,7 +80,7 @@ export function parseUpdateSet(
       validateJsonPath(jsonPath);
 
       if (!Object.prototype.hasOwnProperty.call(tableColumns, columnName)) {
-         throw new Error(`Column '${columnName}' not found on table '${getTableName(baseTable)}'`);
+         throw new ColumnNotFoundError(`Column '${columnName}' not found on table '${getTableName(baseTable)}'`);
       }
 
       if (!jsonMutations[columnName]) {

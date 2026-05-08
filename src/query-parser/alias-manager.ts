@@ -2,6 +2,7 @@ import { aliasedTable, getTableName, getTableColumns } from "drizzle-orm";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildJsonExtractionSql } from "./json-resolver";
 import type { AnyTable } from "../types";
+import { TableNotFoundError, AliasNotFoundError, ColumnNotFoundError } from "../errors";
 
 export type AliasMap = Map<string, AnyTable>;
 
@@ -36,7 +37,7 @@ export function buildAliases(
     if (lastNode) {
       const targetTable = tables.find((t) => getTableName(t) === lastNode.relatedTable);
       if (!targetTable) {
-        throw new Error(`Table '${lastNode.relatedTable}' not found in provided tables array.`);
+        throw new TableNotFoundError(`Table '${lastNode.relatedTable}' not found in provided tables array.`);
       }
 
       const aliasName = generateAliasName(path, prefix);
@@ -66,7 +67,7 @@ export function getColumn(
   if (resolution.relationPath) {
     targetTable = aliasMap.get(resolution.relationPath);
     if (!targetTable) {
-      throw new Error(`Alias not found for relation path '${resolution.relationPath}'. Make sure it was added to the CTE or Outer paths.`);
+      throw new AliasNotFoundError(`Alias not found for relation path '${resolution.relationPath}'. Make sure it was added to the CTE or Outer paths.`);
     }
   }
 
@@ -77,13 +78,13 @@ export function getColumn(
 
     const columns = getTableColumns(targetTable);
     if (!Object.prototype.hasOwnProperty.call(columns, columnName)) {
-      throw new Error(`Column '${columnName}' not found on table '${getTableName(targetTable)}'`);
+      throw new ColumnNotFoundError(`Column '${columnName}' not found on table '${getTableName(targetTable)}'`);
     }
 
     const rawColumn = targetTable[columnName];
 
     if (!rawColumn) {
-      throw new Error(`Column '${columnName}' not found on table '${getTableName(targetTable)}'`);
+      throw new ColumnNotFoundError(`Column '${columnName}' not found on table '${getTableName(targetTable)}'`);
     }
 
     if (jsonParts.length > 1) {
