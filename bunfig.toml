@@ -1,0 +1,21 @@
+# Reduce memory usage at the cost of performance
+smol = true
+telemetry = false
+
+[debug]
+editor = "code"
+
+[install]
+optional = true
+peer = true
+
+[console]
+depth = 3
+
+[test]
+root = "./src"
+smol = true
+coverage = true
+coverageThreshold = { lines = 0.50, functions = 0.50 }
+coverageReporter = ["text", "lcov"]
+coverageDir = "./coverage"
