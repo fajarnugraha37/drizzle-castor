@@ -215,6 +215,13 @@ export async function readExample(args?: string[]) {
           filter: {
             id: { $in: users.map((u) => u.id) },
           },
+          order: {
+            age: {
+              direction: 'desc',
+              nulls: 'last',
+              aggregate: 'max',
+            }
+          }
         },
         profile as any,
       );
