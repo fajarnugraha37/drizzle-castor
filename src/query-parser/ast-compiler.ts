@@ -1,4 +1,4 @@
-import { SQL, eq, asc, desc, sql, aliasedTable, getTableName } from "drizzle-orm";
+import { SQL, eq, asc, desc, sql, aliasedTable, getTableName, and, isNull, ne, or } from "drizzle-orm";
 import { getColumn } from "./alias-manager";
 import type { AliasMap } from "./alias-manager";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
@@ -80,6 +80,7 @@ export function applyJoins(
   baseTableName: string,
   baseTable: any,
   aliasMap: AliasMap,
+  resolvedSoftDelete: Record<string, { restore?: any, delete?: any }>,
 ) {
   // Sort paths by depth so parents are joined before children
   const sortedPaths = Array.from(paths).sort(
@@ -104,6 +105,27 @@ export function applyJoins(
         throw new Error(`Parent table alias not found for path '${path}'`);
       }
 
+      let softDeleteConditions: SQL | undefined = undefined;
+      const sdConfig = resolvedSoftDelete[lastNode.relatedTable];
+      if (sdConfig && sdConfig.delete) {
+        const conditions: SQL[] = [];
+        
+        // Apply active soft delete filter to related tables using deleteValue
+        const origDelete = metadata[lastNode.relatedTable]?.softDelete?.deleteValue;
+        for (const [k, v] of Object.entries(sdConfig.delete)) {
+          const col = (aliased as any)[k];
+          if (origDelete && typeof origDelete[k] === "function") {
+            conditions.push(isNull(col));
+          } else {
+            conditions.push(or(ne(col, v), isNull(col)) as SQL);
+          }
+        }
+
+        if (conditions.length > 0) {
+          softDeleteConditions = and(...conditions);
+        }
+      }
+
       if (lastNode.type === "manyToMany") {
         const joinTableName = lastNode.joinTable;
         const localColumnName = lastNode.localKey?.split(".")[1];
@@ -125,7 +147,8 @@ export function applyJoins(
 
            if (localCol && joinLocalCol && relatedCol && joinRelatedCol) {
               currentQb = currentQb.leftJoin(joinTableAlias, eq(localCol, joinLocalCol));
-              currentQb = currentQb.leftJoin(aliased, eq(joinRelatedCol, relatedCol));
+              const joinCond = softDeleteConditions ? and(eq(joinRelatedCol, relatedCol), softDeleteConditions) : eq(joinRelatedCol, relatedCol);
+              currentQb = currentQb.leftJoin(aliased, joinCond);
            }
         }
       } else {
@@ -138,7 +161,8 @@ export function applyJoins(
           const foreignCol = (aliased as any)[foreignColumnName];
 
           if (localCol && foreignCol) {
-            currentQb = currentQb.leftJoin(aliased, eq(localCol, foreignCol));
+            const joinCond = softDeleteConditions ? and(eq(localCol, foreignCol), softDeleteConditions) : eq(localCol, foreignCol);
+            currentQb = currentQb.leftJoin(aliased, joinCond);
           }
         }
       }
@@ -179,7 +203,7 @@ export function parseFilter(
       const col = getColumn(key, baseTable, aliasMap, metadata, baseTableName, db);
       if (col && typeof value === "object" && value !== null) {
         for (const [op, opValue] of Object.entries(value as object)) {
-          conditions.push(buildFieldOperator(col, op, opValue));
+          conditions.push(buildFieldOperator(col, op, opValue, db));
         }
       }
     }

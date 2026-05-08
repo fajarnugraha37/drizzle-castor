@@ -5,11 +5,14 @@ export * from "./alias-manager";
 export * from "./ast-compiler";
 export * from "./hydrator";
 export * from "./json-resolver";
+export * from "./soft-delete-helper";
 
-import { sql, getTableName } from "drizzle-orm";
-import { analyzeQuery } from "./analyzer";
+import { sql, getTableName, exists, aliasedTable, and, eq, getTableColumns } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
+import { analyzeQuery, extractFilterPaths } from "./analyzer";
 import { buildAliases } from "./alias-manager";
 import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compiler";
+import { resolveProviderValues } from "./soft-delete-helper";
 import type { AnyTable, SearchQuery } from "../types";
 
 export type TranslatorContext = {
@@ -20,10 +23,83 @@ export type TranslatorContext = {
 };
 
 /**
+ * Checks if a filter only touches the base table (no relations).
+ */
+export function isFilterSimple(filter: any, metadata: any, baseTableName: string): boolean {
+  if (!filter) return true;
+  const paths = new Set<string>();
+  extractFilterPaths(filter, paths, metadata, baseTableName);
+  return paths.size === 0;
+}
+
+/**
+ * Builds a correlated EXISTS condition for complex batch mutations.
+ * Bypasses IN (subquery) materialization issues.
+ */
+export async function buildExistsCondition(
+  filter: any,
+  context: TranslatorContext,
+  baseTable: any,
+): Promise<SQL> {
+  const { db, tables, metadata, baseTableName } = context;
+  const pkName = (Object.keys(getTableColumns(baseTable)).find(k => (baseTable as any)[k].primary) || "id") as string;
+  const pkColumn = baseTable[pkName];
+
+  const subTableAliasName = `sub_${baseTableName}_correlate`;
+  const subTable = aliasedTable(baseTable, subTableAliasName);
+  const paths = analyzeQuery({ filter }, metadata, baseTableName);
+  
+  // Create unique aliases for subquery relations using "sub" prefix
+  const subAliasMap = buildAliases(
+    paths.ctePaths,
+    tables,
+    metadata,
+    baseTableName,
+    "sub"
+  );
+  
+  // Pre-resolve soft delete conditions
+  const resolvedSoftDelete: Record<string, { restore?: any, delete?: any }> = {};
+  for (const table of tables) {
+    const tName = getTableName(table);
+    const sdConfig = metadata[tName]?.softDelete;
+    if (sdConfig) {
+      resolvedSoftDelete[tName] = {
+        restore: sdConfig.restoreValue ? await resolveProviderValues(sdConfig.restoreValue) : undefined,
+        delete: sdConfig.deleteValue ? await resolveProviderValues(sdConfig.deleteValue) : undefined,
+      };
+    }
+  }
+
+  let subquery = db.select({ 1: sql`1` }).from(subTable);
+  subquery = applyJoins(
+    subquery,
+    paths.ctePaths,
+    tables,
+    metadata,
+    baseTableName,
+    subTable,
+    subAliasMap,
+    resolvedSoftDelete
+  );
+  
+  const filterAst = parseFilter(filter, subTable, subAliasMap, metadata, baseTableName, db);
+  const correlation = eq((subTable as any)[pkName], pkColumn);
+
+  if (filterAst) {
+    subquery = subquery.where(and(correlation, filterAst));
+  } else {
+    subquery = subquery.where(correlation);
+  }
+
+  return exists(subquery);
+}
+
+/**
  * Translates a SearchQuery into a Drizzle AST execution plan (Split Queries strategy).
  * Returns the two queries: the CTE (for pagination/filtering) and the Outer query (for hydration).
  */
-export function buildSearchQueries<T>(
+export async function buildSearchQueries<T>(
   query: SearchQuery<T>,
   context: TranslatorContext,
   isPaginated: boolean = false
@@ -52,6 +128,19 @@ export function buildSearchQueries<T>(
     baseTableName,
   );
 
+  // Pre-resolve soft delete conditions for all tables to avoid returning a Promise of a QueryBuilder
+  const resolvedSoftDelete: Record<string, { restore?: any, delete?: any }> = {};
+  for (const table of tables) {
+    const tName = getTableName(table);
+    const sdConfig = metadata[tName]?.softDelete;
+    if (sdConfig) {
+      resolvedSoftDelete[tName] = {
+        restore: sdConfig.restoreValue ? await resolveProviderValues(sdConfig.restoreValue) : undefined,
+        delete: sdConfig.deleteValue ? await resolveProviderValues(sdConfig.deleteValue) : undefined,
+      };
+    }
+  }
+
   // 3. Build CTE Query Builder
   let cteQb = db.select({ id: (baseTable as any).id }).from(baseTable);
   cteQb = applyJoins(
@@ -62,6 +151,7 @@ export function buildSearchQueries<T>(
     baseTableName,
     baseTable,
     cteAliasMap,
+    resolvedSoftDelete,
   );
 
   const filterAst = parseFilter(query.filter, baseTable, cteAliasMap, metadata, baseTableName, db);
@@ -102,6 +192,7 @@ export function buildSearchQueries<T>(
     baseTableName,
     baseTable,
     cteAliasMap,
+    resolvedSoftDelete,
   );
   if (filterAst) {
     countQb = countQb.where(filterAst);
@@ -123,9 +214,11 @@ export function buildSearchQueries<T>(
     baseTableName,
     baseTable,
     outerAliasMap,
+    resolvedSoftDelete,
   );
 
   return {
+    cteQuery: cteQb,
     mainQuery: mainQb,
     countQuery: countQb,
   };

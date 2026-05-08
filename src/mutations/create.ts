@@ -49,7 +49,7 @@ export async function executeCreateOne(
     pageSize: 1
   };
   
-  const { mainQuery } = buildSearchQueries(query as any, translatorContext, true);
+  const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
   const rawRows = await mainQuery;
   const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
   
@@ -95,7 +95,7 @@ export async function executeCreateMany(
     filter: { [pkName]: { $inArray: insertedIds } },
   };
   
-  const { mainQuery } = buildSearchQueries(query as any, translatorContext, false);
+  const { mainQuery } = await buildSearchQueries(query as any, translatorContext, false);
   const rawRows = await mainQuery;
   const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
 

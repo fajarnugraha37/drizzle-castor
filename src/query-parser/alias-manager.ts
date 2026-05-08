@@ -10,8 +10,8 @@ export type AliasMap = Map<string, AnyTable>;
  * Replaces dots with underscores.
  * e.g., "posts.comments" -> "rel_posts_comments"
  */
-export function generateAliasName(path: string): string {
-  return `rel_${path.replace(/\./g, "_")}`;
+export function generateAliasName(path: string, prefix: string = "rel"): string {
+  return `${prefix}_${path.replace(/\./g, "_")}`;
 }
 
 /**
@@ -23,6 +23,7 @@ export function buildAliases(
   tables: readonly AnyTable[],
   metadata: any,
   baseTableName: string,
+  prefix: string = "rel",
 ): AliasMap {
   const aliasMap: AliasMap = new Map();
 
@@ -38,7 +39,7 @@ export function buildAliases(
         throw new Error(`Table '${lastNode.relatedTable}' not found in provided tables array.`);
       }
 
-      const aliasName = generateAliasName(path);
+      const aliasName = generateAliasName(path, prefix);
       const aliased = aliasedTable(targetTable, aliasName);
       aliasMap.set(path, aliased);
     }

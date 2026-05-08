@@ -1,25 +1,6 @@
-import { buildSearchQueries, hydrateResults, parseUpdateSet, type TranslatorContext } from "../query-parser";
+import { buildSearchQueries, hydrateResults, parseUpdateSet, resolveProviderValues, isFilterSimple, parseFilter, injectSoftDeleteFilter, buildExistsCondition, type TranslatorContext } from "../query-parser";
 import type { DbAction, SoftDeleteConfig } from "../types";
 import { getPrimaryKeyColumnName } from "./create";
-import { eq, inArray } from "drizzle-orm";
-
-/**
- * Resolves static values, synchronous functions, or asynchronous promises
- * defined in the SoftDeleteConfig into a raw object.
- */
-async function resolveProviderValues(configObj: any): Promise<Record<string, any>> {
-  if (!configObj) return {};
-  
-  const resolved: Record<string, any> = {};
-  for (const [key, provider] of Object.entries(configObj)) {
-    if (typeof provider === "function") {
-      resolved[key] = await provider();
-    } else {
-      resolved[key] = provider;
-    }
-  }
-  return resolved;
-}
 
 function getSoftDeleteConfig(metadata: any, tableName: string): SoftDeleteConfig<any> {
   const config = metadata[tableName]?.softDelete;
@@ -49,23 +30,28 @@ export async function executeSoftDeleteOne(
     await hooks.beforeSoftDelete(filter);
   }
 
+  // ATOMIC UPDATE: Single query for single record soft delete
+  const searchQuery = await injectSoftDeleteFilter({
+    filter: { [pkName]: { $eq: id } },
+  }, metadata, baseTableName, "active");
+
+  const whereAst = parseFilter(searchQuery.filter, baseTable, new Map(), metadata, baseTableName, db);
   const setParams = await resolveProviderValues(config.deleteValue);
   const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
-  const pkColumn = baseTable[pkName];
 
   const updateResult = await db
     .update(baseTable)
     .set(parsedSetParams)
-    .where(eq(pkColumn, id))
+    .where(whereAst)
     .returning();
 
   if (!updateResult || updateResult.length === 0) {
-    return false; // Not found
+    return false; // Not found or already deleted
   }
 
   if (hooks?.afterSoftDelete) {
     const query = { filter, page: 1, pageSize: 1 };
-    const { mainQuery } = buildSearchQueries(query as any, translatorContext, true);
+    const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
     const rawRows = await mainQuery;
     const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
     await hooks.afterSoftDelete(hydratedData);
@@ -92,35 +78,53 @@ export async function executeSoftDeleteMany(
   }
 
   const pkName = getPrimaryKeyColumnName(baseTable);
-  const pkColumn = baseTable[pkName];
 
-  // 1. Find affected IDs
-  const searchQuery = { filter, projection: [pkName] };
-  const { mainQuery } = buildSearchQueries(searchQuery as any, translatorContext, false);
-  const rawRows = await mainQuery;
-  const affectedIds = hydrateResults(rawRows, baseTableName, metadata, pkName).map((e) => e[pkName]);
+  // 1. Inject soft delete filter
+  const searchQuery = await injectSoftDeleteFilter({
+    filter,
+  }, metadata, baseTableName, "active");
 
-  if (affectedIds.length === 0) return 0;
-
-  // 2. Perform Update
   const setParams = await resolveProviderValues(config.deleteValue);
   const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
 
-  await db
-    .update(baseTable)
-    .set(parsedSetParams)
-    .where(inArray(pkColumn, affectedIds));
+  let deletedCount = 0;
 
-  // 3. Hydrate and trigger hook
-  if (hooks?.afterSoftDelete) {
-    const rehydrateQuery = { filter: { [pkName]: { $inArray: affectedIds } } };
-    const { mainQuery: hydrationQuery } = buildSearchQueries(rehydrateQuery as any, translatorContext, false);
-    const hydratedRows = await hydrationQuery;
-    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName);
-    await hooks.afterSoftDelete(hydratedData);
+  // 2. Execute Update (Atomically)
+  if (isFilterSimple(searchQuery.filter, metadata, baseTableName)) {
+    const whereAst = parseFilter(searchQuery.filter, baseTable, new Map(), metadata, baseTableName, db);
+    const updateResult: any = await db
+      .update(baseTable)
+      .set(parsedSetParams)
+      .where(whereAst);
+    deletedCount = updateResult.rowsAffected ?? -1;
+  } else {
+    // Correlated EXISTS: No materialization, true atomic batch update
+    const existsCond = await buildExistsCondition(searchQuery.filter, translatorContext, baseTable);
+    const updateResult: any = await db
+      .update(baseTable)
+      .set(parsedSetParams)
+      .where(existsCond);
+    deletedCount = updateResult.rowsAffected ?? -1;
   }
 
-  return affectedIds.length;
+  if (deletedCount === 0) return 0;
+
+  // 3. Hydrate and trigger hook ONLY if hooks exist
+  if (hooks?.afterSoftDelete) {
+    // Re-fetch using original filter, but looking in DELETED mode since they are now deleted
+    const rehydrateSearchQuery = await injectSoftDeleteFilter({
+      filter,
+    }, metadata, baseTableName, "deleted");
+
+    const { mainQuery: hydrationQuery } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
+    const hydratedRows = await hydrationQuery;
+    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName);
+    
+    await hooks.afterSoftDelete(hydratedData);
+    if (deletedCount === -1) deletedCount = hydratedData.length;
+  }
+
+  return deletedCount;
 }
 
 export async function executeRestoreOne(
@@ -143,23 +147,28 @@ export async function executeRestoreOne(
     await hooks.beforeRestore(filter);
   }
 
+  // ATOMIC UPDATE: Single query restore
+  const searchQuery = await injectSoftDeleteFilter({
+    filter: { [pkName]: { $eq: id } },
+  }, metadata, baseTableName, "deleted");
+
+  const whereAst = parseFilter(searchQuery.filter, baseTable, new Map(), metadata, baseTableName, db);
   const setParams = await resolveProviderValues(config.restoreValue);
   const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
-  const pkColumn = baseTable[pkName];
 
   const updateResult = await db
     .update(baseTable)
     .set(parsedSetParams)
-    .where(eq(pkColumn, id))
+    .where(whereAst)
     .returning();
 
   if (!updateResult || updateResult.length === 0) {
-    return false; // Not found
+    return false; // Not found or already active
   }
 
   if (hooks?.afterRestore) {
     const query = { filter, page: 1, pageSize: 1 };
-    const { mainQuery } = buildSearchQueries(query as any, translatorContext, true);
+    const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
     const rawRows = await mainQuery;
     const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
     await hooks.afterRestore(hydratedData);
@@ -186,33 +195,51 @@ export async function executeRestoreMany(
   }
 
   const pkName = getPrimaryKeyColumnName(baseTable);
-  const pkColumn = baseTable[pkName];
 
-  // 1. Find affected IDs
-  const searchQuery = { filter, projection: [pkName] };
-  const { mainQuery } = buildSearchQueries(searchQuery as any, translatorContext, false);
-  const rawRows = await mainQuery;
-  const affectedIds = hydrateResults(rawRows, baseTableName, metadata, pkName).map((e) => e[pkName]);
+  // 1. Inject soft delete filter (searching for DELETED records to restore)
+  const searchQuery = await injectSoftDeleteFilter({
+    filter,
+  }, metadata, baseTableName, "deleted");
 
-  if (affectedIds.length === 0) return 0;
-
-  // 2. Perform Update
   const setParams = await resolveProviderValues(config.restoreValue);
   const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
 
-  await db
-    .update(baseTable)
-    .set(parsedSetParams)
-    .where(inArray(pkColumn, affectedIds));
+  let restoredCount = 0;
 
-  // 3. Hydrate and trigger hook
-  if (hooks?.afterRestore) {
-    const rehydrateQuery = { filter: { [pkName]: { $inArray: affectedIds } } };
-    const { mainQuery: hydrationQuery } = buildSearchQueries(rehydrateQuery as any, translatorContext, false);
-    const hydratedRows = await hydrationQuery;
-    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName);
-    await hooks.afterRestore(hydratedData);
+  // 2. Execute Update (Atomically)
+  if (isFilterSimple(searchQuery.filter, metadata, baseTableName)) {
+    const whereAst = parseFilter(searchQuery.filter, baseTable, new Map(), metadata, baseTableName, db);
+    const updateResult: any = await db
+      .update(baseTable)
+      .set(parsedSetParams)
+      .where(whereAst);
+    restoredCount = updateResult.rowsAffected ?? -1;
+  } else {
+    // Correlated EXISTS: No materialization, true atomic batch update
+    const existsCond = await buildExistsCondition(searchQuery.filter, translatorContext, baseTable);
+    const updateResult: any = await db
+      .update(baseTable)
+      .set(parsedSetParams)
+      .where(existsCond);
+    restoredCount = updateResult.rowsAffected ?? -1;
   }
 
-  return affectedIds.length;
+  if (restoredCount === 0) return 0;
+
+  // 3. Hydrate and trigger hook ONLY if hooks exist
+  if (hooks?.afterRestore) {
+    // Re-fetch using original filter, but looking in ACTIVE mode since they are now restored
+    const rehydrateSearchQuery = await injectSoftDeleteFilter({
+      filter,
+    }, metadata, baseTableName, "active");
+
+    const { mainQuery: hydrationQuery } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
+    const hydratedRows = await hydrationQuery;
+    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName);
+    
+    await hooks.afterRestore(hydratedData);
+    if (restoredCount === -1) restoredCount = hydratedData.length;
+  }
+
+  return restoredCount;
 }

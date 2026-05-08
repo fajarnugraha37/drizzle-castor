@@ -30,13 +30,18 @@ import type { AnyColumn } from "drizzle-orm";
  * @param column The Drizzle Column instance
  * @param operator The string operator (e.g., "$eq", "$ilike")
  * @param value The value associated with the operator
+ * @param db The database instance to detect dialect
  */
 export function buildFieldOperator(
   column: AnyColumn,
   operator: string,
   value: any,
+  db: any,
 ): SQL | undefined {
   if (value === undefined) return undefined;
+
+  const dialectName = db?.dialect?.constructor?.name || "";
+  const isSQLite = dialectName.toLowerCase().includes("sqlite");
 
   switch (operator) {
     case "$eq":
@@ -76,11 +81,12 @@ export function buildFieldOperator(
     case "$like":
       return like(column, value);
     case "$ilike":
-      return ilike(column, value);
+      // SQLite doesn't natively support ILIKE
+      return isSQLite ? like(column, value) : ilike(column, value);
     case "$notLike":
       return notLike(column, value);
     case "$notIlike":
-      return notIlike(column, value);
+      return isSQLite ? notLike(column, value) : notIlike(column, value);
     case "$arrayContains":
       return Array.isArray(value) ? arrayContains(column, value) : undefined;
     case "$arrayContained":

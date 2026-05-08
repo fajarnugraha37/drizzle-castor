@@ -1,5 +1,5 @@
-import { eq, inArray } from "drizzle-orm";
-import { buildSearchQueries, hydrateResults, type TranslatorContext } from "../query-parser";
+import { eq } from "drizzle-orm";
+import { buildSearchQueries, hydrateResults, isFilterSimple, parseFilter, buildExistsCondition, type TranslatorContext } from "../query-parser";
 import type { DbAction } from "../types";
 import { getPrimaryKeyColumnName } from "./create";
 
@@ -22,11 +22,11 @@ export async function executeHardDeleteOne(
     await hooks.beforeHardDelete(filter);
   }
 
-  // To provide the 'affected' entities to afterHardDelete, we need to fetch them before deleting
+  // Fetch full entity only if needed for hooks
   let entitiesToDelete: any[] = [];
   if (hooks?.afterHardDelete) {
     const query = { filter, page: 1, pageSize: 1 };
-    const { mainQuery } = buildSearchQueries(query as any, translatorContext, true);
+    const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
     const rawRows = await mainQuery;
     entitiesToDelete = hydrateResults(rawRows, baseTableName, metadata, pkName);
   }
@@ -37,11 +37,6 @@ export async function executeHardDeleteOne(
     .delete(baseTable)
     .where(eq(pkColumn, id));
 
-  // SQLite driver doesn't consistently return affected rows in a standard way across all bundlers,
-  // but usually it's checked via some property if not using returning().
-  // Assuming if it didn't throw, we consider it executed. 
-  // We can return true if entitiesToDelete was found, or just return true.
-  
   if (hooks?.afterHardDelete && entitiesToDelete.length > 0) {
     await hooks.afterHardDelete(entitiesToDelete);
   }
@@ -65,42 +60,36 @@ export async function executeHardDeleteMany(
 
   const { db, metadata, baseTableName } = translatorContext;
   const pkName = getPrimaryKeyColumnName(baseTable);
-  const pkColumn = baseTable[pkName];
 
-  // Find affected IDs using the query parser
-  const searchQuery = {
-    filter,
-    projection: [pkName],
-  };
-
-  const { mainQuery } = buildSearchQueries(searchQuery as any, translatorContext, false);
-  const rawRows = await mainQuery;
-  const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
-  const affectedIds = hydratedData.map((e) => e[pkName]);
-
-  if (affectedIds.length === 0) {
-    return 0; // Nothing to delete
+  // Fetch full entities BEFORE deletion if hooks exist (Using original filter natively via joins/exists)
+  let entitiesToDelete: any[] = [];
+  if (hooks?.afterHardDelete) {
+    const { mainQuery } = await buildSearchQueries({ filter } as any, translatorContext, false);
+    const rawRows = await mainQuery;
+    entitiesToDelete = hydrateResults(rawRows, baseTableName, metadata, pkName);
+    
+    if (entitiesToDelete.length === 0) return 0;
   }
 
-  // We need to fetch full entities if afterHardDelete hook exists
-  let entitiesToDelete = hydratedData;
-  if (hooks?.afterHardDelete) {
-    // If projection was restricted to pkName, we should fetch the full objects
-    const fullSearchQuery = {
-      filter: { [pkName]: { $inArray: affectedIds } },
-    };
-    const { mainQuery: fullMainQuery } = buildSearchQueries(fullSearchQuery as any, translatorContext, false);
-    const fullRawRows = await fullMainQuery;
-    entitiesToDelete = hydrateResults(fullRawRows, baseTableName, metadata, pkName);
+  // Step 1: Detect if simple or complex
+  const isSimple = isFilterSimple(filter, metadata, baseTableName);
+  let deletedCount = 0;
+
+  if (isSimple) {
+    const whereAst = parseFilter(filter, baseTable, new Map(), metadata, baseTableName, db);
+    const result: any = await db.delete(baseTable).where(whereAst);
+    deletedCount = result.rowsAffected ?? entitiesToDelete.length;
+  } else {
+    // Complex Delete: use correlated EXISTS subquery for true atomicity
+    const existsCond = await buildExistsCondition(filter, translatorContext, baseTable);
+    const result: any = await db.delete(baseTable).where(existsCond);
+    deletedCount = result.rowsAffected ?? entitiesToDelete.length;
   }
 
-  await db
-    .delete(baseTable)
-    .where(inArray(pkColumn, affectedIds));
-
-  if (hooks?.afterHardDelete) {
+  if (hooks?.afterHardDelete && entitiesToDelete.length > 0) {
     await hooks.afterHardDelete(entitiesToDelete);
   }
 
-  return affectedIds.length;
+  // If no rowsAffected is returned (like in Postgres without returning), fallback to the known length if fetched
+  return deletedCount === -1 ? entitiesToDelete.length : deletedCount;
 }

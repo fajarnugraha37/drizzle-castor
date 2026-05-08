@@ -66,7 +66,7 @@ export function analyzeQuery<T>(
   return { ctePaths, outerPaths, needsGroupBy };
 }
 
-function extractFilterPaths(
+export function extractFilterPaths(
   filter: any, 
   paths: Set<string>,
   metadata: any,

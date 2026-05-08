@@ -1,6 +1,6 @@
 import { executeCreateOne, executeCreateMany } from "./mutations/create";
 import { executeUpdateOne, executeUpdateMany } from "./mutations/update";
-import { executeSearchOne, executeSearchPage, executeSearchMany } from "./queries/search";
+import { executeSearchOne, executeSearchPage, executeSearchMany, executeSearchDeletedOne, executeSearchDeletedPage, executeSearchDeletedMany } from "./queries/search";
 import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete";
 import { executeSoftDeleteOne, executeSoftDeleteMany, executeRestoreOne, executeRestoreMany } from "./mutations/soft-delete";
 import { getTableName } from "drizzle-orm";
@@ -121,28 +121,19 @@ export function defineSchemaMetadata<
           return executeSearchMany(query, checkAccess, profile as any, hooks, translatorContext, tableName);
         },
         searchDeletedOne: async (query, profile) => {
-          checkAccess("read", profile as any);
-          console.log(
-            `Executing searchDeletedOne on ${tableName} with query:`,
-            query,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          return executeSearchDeletedOne(query, checkAccess, profile as any, hooks, translatorContext, tableName);
         },
         searchDeletedPage: async (query, profile) => {
-          checkAccess("read", profile as any);
-          console.log(
-            `Executing searchDeletedPage on ${tableName} with query:`,
-            query,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          return executeSearchDeletedPage(query, checkAccess, profile as any, hooks, translatorContext, tableName) as any;
         },
         searchDeletedMany: async (query, profile) => {
-          checkAccess("read", profile as any);
-          console.log(
-            `Executing searchDeletedMany on ${tableName} with query:`,
-            query,
-          );
-          throw new Error("Not implemented");
+          const tableConfig = (metadata as any)[tableName];
+          const hooks = tableConfig?.hooks;
+          return executeSearchDeletedMany(query, checkAccess, profile as any, hooks, translatorContext, tableName);
         },
         updateOne: async (id, set, profile) => {
           const tableConfig = (metadata as any)[tableName];

@@ -1,404 +1,58 @@
-import { drizzle } from "drizzle-orm/bun-sqlite";
-import { createSchemaBuilder } from "../";
-import type {} from "../";
+import "bun";
+import  "../";
 import { seed } from "./seed";
-import {
-  companiesTable,
-  usersTable,
-  profilesTable,
-  postsTable,
-  commentsTable,
-  groupsTable,
-  userGroups,
-} from "./schema";
-import { DefaultLogger, Logger } from "drizzle-orm";
-import { faker } from "@faker-js/faker";
-import {} from "bun";
-import { getDatabaseFileLocation } from "./helper";
+import { createExample } from "./modules/create.example";
+import { updateExample } from "./modules/update.example";
+import { readExample } from "./modules/read.example";
+import { hardDeleteExample } from "./modules/hard-delete.example";
+import { softDeleteExample } from "./modules/soft-delete.example";
 
 {
-  const command = process.argv.splice(2).join(" ");
-  const db = drizzle(getDatabaseFileLocation(), {
-    logger: new DefaultLogger({
-      writer: new (class implements Logger {
-        logQuery(query: string, params: unknown[]): void {
-          // console.log("=============== Drizzle ===============");
-          // console.log("Executing query:");
-          // console.log(query);
-          // console.log("With params:");
-          // console.log(params);
-          // console.log("=======================================");
-        }
-        write(message: string): void {
-          console.log("=============== Drizzle ===============");
-          console.log(message);
-          console.log("=======================================");
-        }
-      })(),
-    }),
-  });
+  const command = process.argv[2];
+  const subCommand = process.argv[3];
+  console.log("Received command:", command, "with subcommand:", subCommand);
+
   switch (command) {
     case "--seed":
-      console.log("Seeding database...");
-      await seed(db, process.argv.splice(2));
-      console.log("Database seeded successfully.");
+      console.log("> Seeding database...");
+      await seed(process.argv.splice(2));
       break;
     case "--main":
-      console.log("Running main function...");
-      await main(db, process.argv.splice(2));
-      console.log("Main function executed successfully.");
+      switch (subCommand) {
+        case "-c":
+        case "--create":
+          console.log("> Running main function with create subcommand...");
+          await createExample(process.argv.splice(3));
+          break;
+        case "-r":
+        case "--read":
+          console.log("> Running main function with read subcommand...");
+          await readExample(process.argv.splice(3));
+          break;
+        case "-u":
+        case "--update":
+          console.log("> Running main function with update subcommand...");
+          await updateExample(process.argv.splice(3));
+          break;
+        case "-sd":
+        case "--soft-delete":
+          console.log("> Running main function with soft-delete subcommand...");
+          await softDeleteExample(process.argv.splice(3));
+          break;
+        case "-hd":
+        case "--hard-delete":
+          console.log("> Running main function with hard-delete subcommand...");
+          await hardDeleteExample(process.argv.splice(3));
+          break;
+        default:
+          console.log("> Running main function with no specific subcommand...");
+          break;
+      }
       break;
     default:
       console.log(
-        "Unknown command. Use '--seed' to seed the database or '--main' to run the main function.",
+        "> No valid command provided. Use --seed to seed the database or --main with a subcommand to run the main function.",
       );
       break;
-  }
-}
-
-async function main(db: any, args?: string[]) {
-  const tables = [
-    companiesTable,
-    usersTable,
-    profilesTable,
-    postsTable,
-    commentsTable,
-    groupsTable,
-    userGroups,
-  ] as const;
-
-  const schemaMetadata = createSchemaBuilder(db, tables)
-    .table("users", {
-      oneToOne: [
-        {
-          relationName: "profile",
-          relatedTable: "profiles",
-          localKey: "users.id",
-          foreignKey: "profiles.userId",
-        },
-        {
-          relationName: "company",
-          relatedTable: "companies",
-          localKey: "users.companyId",
-          foreignKey: "companies.id",
-        },
-      ],
-      oneToMany: [
-        {
-          relationName: "posts",
-          relatedTable: "posts",
-          localKey: "users.id",
-          foreignKey: "posts.userId",
-        },
-      ],
-      manyToMany: [
-        {
-          relationName: "groups",
-          joinTable: "users_to_groups",
-          localKey: "users.id",
-          joinLocalKey: "users_to_groups.userId",
-          relatedTable: "groups",
-          relatedKey: "groups.id",
-          joinRelatedKey: "users_to_groups.groupId",
-        },
-      ],
-      profiles: {
-        default: ["read"],
-        public: ["read"],
-        admin: [
-          "create",
-          "read",
-          "update",
-          "softDelete",
-          "restore",
-          "hardDelete",
-        ],
-      },
-      hooks: {
-        beforeSearch: async (query): Promise<void> => {
-          // console.log(`[Hooks] Before search hook triggered`);
-          // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
-        },
-        afterSearch: async (query, result): Promise<void> => {
-          // console.log(`[Hooks] After search hook triggered`);
-          // console.log(`[Hooks] After search hook triggered for users with query:`, query);
-          // console.log(`[Hooks] Search result:`, result[0]?.name);
-        },
-        beforeCreate: async (data): Promise<void> => {
-          // console.log(`[Hooks] Before create hook triggered`);
-          // console.log(`[Hooks] Before create hook triggered for users with data:`, data);
-        },
-        afterCreate: async (data): Promise<void> => {
-          // console.log(`[Hooks] After create hook triggered`);
-          // console.log(`[Hooks] After create hook triggered for users with data:`, data);
-          // console.log(`[Hooks] Created user:`, result.name);
-        },
-      },
-      softDelete: {
-        deleteValue: {
-          deletedFlag: 1,
-          deletedAt: () => Date.now(),
-          deletedBy: "system_deleter"
-        },
-        restoreValue: {
-          deletedFlag: 0,
-          deletedAt: null,
-          deletedBy: null
-        }
-      }
-    })
-    .table("profiles", {
-      oneToOne: [
-        {
-          relationName: "user",
-          relatedTable: "users",
-          localKey: "profiles.userId",
-          foreignKey: "users.id",
-        },
-      ],
-    })
-    .table("comments", {
-      manyToOne: [
-        {
-          relationName: "post",
-          relatedTable: "posts",
-          localKey: "comments.postId",
-          foreignKey: "posts.id",
-        },
-      ],
-    })
-    .table("companies", {
-      oneToMany: [
-        {
-          relationName: "users",
-          relatedTable: "users",
-          localKey: "companies.id",
-          foreignKey: "users.companyId",
-        },
-      ],
-    })
-    .table("groups", {
-      manyToMany: [
-        {
-          relationName: "users",
-          joinTable: "users_to_groups",
-          localKey: "groups.id",
-          joinLocalKey: "users_to_groups.groupId",
-          relatedTable: "users",
-          relatedKey: "users.id",
-          joinRelatedKey: "users_to_groups.userId",
-        },
-      ],
-    })
-    .table("posts", {
-      manyToOne: [
-        {
-          relationName: "user",
-          relatedTable: "users",
-          localKey: "posts.userId",
-          foreignKey: "users.id",
-        },
-      ],
-      oneToMany: [
-        {
-          relationName: "comments",
-          relatedTable: "comments",
-          localKey: "posts.id",
-          foreignKey: "comments.postId",
-        },
-      ],
-    })
-    .table("users_to_groups", {
-      manyToOne: [
-        {
-          relationName: "user",
-          relatedTable: "users",
-          localKey: "users_to_groups.userId",
-          foreignKey: "users.id",
-        },
-      ],
-    })
-    .build();
-
-  const userRepo = schemaMetadata.repoFactory("users", {});
-  const commentRepo = schemaMetadata.repoFactory("comments", {});
-  // for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
-  //   try {
-  //     const users = await userRepo.searchPage(
-  //       {
-  //         filter: {
-  //           $or: [
-  //             // { email: { $like: "Cierra_Hackett%" } },
-  //             // { "posts.title": { $like: "%sunt aut facere%" } },
-  //             // { tags: { $in: ["tag1"] } },
-  //             // { "persona.hobbies": { $in: ["footbal", "baskeet"] } },
-  //           ],
-  //         },
-  //         order: {
-  //           name: {
-  //             direction: "asc",
-  //             nulls: "last",
-  //           },
-  //           age: {
-  //             direction: "desc",
-  //             nulls: "last",
-  //             aggregate: "max",
-  //           },
-  //           "profile.bio": {
-  //             direction: "asc",
-  //             aggregate: "min",
-  //           },
-  //           persona: "desc",
-  //         },
-  //         projection: [
-  //           "id",
-  //           "name",
-  //           "tags",
-  //           "email",
-  //           "persona.hobbies",
-  //           "company.name",
-  //           "profile.bio",
-  //         ],
-  //       },
-  //       profile as any,
-  //     );
-  //     console.log(
-  //       `Users fetched successfully with profile ${JSON.stringify(profile)}`,
-  //       users,
-  //     );
-  //   } catch (e: any) {
-  //     console.log(
-  //       `Error fetching users with profile ${JSON.stringify(profile)}: ${e.message}`,
-  //     );
-  //   }
-  // }
-
-  // const comments = await commentRepo.searchMany({
-  //   filter: {},
-  //   projection: [
-  //     "id",
-  //     "content",
-  //     "postId",
-  //     "post.user.name",
-  //     "post.title",
-  //     "post.user.persona.hobbies",
-  //   ],
-  // });
-  // console.log("Comments:", JSON.stringify(comments[0], null, 2));
-
-  // console.log("\n=== Testing createOne ===");
-  // for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
-  //   try {
-  //     const newUser = await userRepo.createOne(
-  //       {
-  //         name: "New User CreateOne",
-  //         email: faker.internet.email(),
-  //         age: 25,
-  //         companyId: 1,
-  //         tags: ["new", "test"],
-  //         persona: { hobbies: ["coding"], skills: ["typescript"] },
-  //       },
-  //       "admin",
-  //     );
-  //     console.log("Created User:", JSON.stringify(newUser, null, 2));
-  //   } catch (err: any) {
-  //     console.error(
-  //       `Error creating user with profile ${JSON.stringify(profile)}:`,
-  //       err.message,
-  //     );
-  //   }
-  // }
-
-  // console.log("\n=== Bulk createMany ===");
-  // for (const profile of ["default", "public", ["public", "admin"], "admin"]) {
-  //   try {
-  //     const newUsers = await userRepo.createMany(
-  //       [
-  //         {
-  //           name: "Bulk " + faker.person.fullName(),
-  //           email: faker.internet.email(),
-  //           age: faker.number.int({ min: 18, max: 60 }),
-  //           companyId: faker.number.int({ min: 1, max: 10 }),
-  //         },
-  //         {
-  //           name: "Bulk " + faker.person.fullName(),
-  //           email: faker.internet.email(),
-  //           age: faker.number.int({ min: 18, max: 60 }),
-  //         },
-  //         {
-  //           name: "Bulk " + faker.person.fullName(),
-  //           email: faker.internet.email(),
-  //           age: faker.number.int({ min: 18, max: 60 }),
-  //           companyId: faker.number.int({ min: 1, max: 10 }),
-  //         },
-  //       ],
-  //       profile as any,
-  //     );
-  //     console.log("Created Users:", JSON.stringify(newUsers, null, 2));
-  //   } catch (err: any) {
-  //     console.error(
-  //       `Error creating users with profile ${JSON.stringify(profile)}:`,
-  //       err.message,
-  //     );
-  //   }
-  // }
-
-  console.log("\n=== Testing updateOne ===");
-  try {
-    const updatedUser = await userRepo.updateOne(193, {
-      name: "Updated User Name",
-      age: 99,
-      "persona.hobbies": ["swimming", "coding", faker.music.genre()],
-      "persona.skills.0": 'nagoya',
-      "settings.occasionally.oldValue": "new value: " + faker.lorem.sentence(),
-      "settings.occasionally.randomValue": faker.number.int(),
-      "settings.theme": "dark",
-      "settings.notifications": false,
-      // "occupational": {
-      //   company: "Updated Company",
-      //   position: "Updated Position",
-      //   period: {
-      //     start: new Date("2020-01-01"),
-      //     end: new Date("2024-01-01"),
-      //   },
-      // },
-      "occupational.company": faker.company.name(),
-      "occupational.position": faker.person.jobTitle(),
-      "occupational.period.start": new Date("2020-01-01"),
-      "occupational.period.end": faker.date.future(),
-    }, "admin");
-    console.log("Updated User:", JSON.stringify(updatedUser, null, 2));
-  } catch (err: any) {
-    console.error("Error updating user:", err.message);
-  }
-
-  console.log("\n=== Testing updateMany ===");
-  try {
-    const updatedUsers = await userRepo.updateMany({
-      email: { $like: "Cierra_Hackett%" }
-    } as any, {
-      age: 100,
-    }, "admin");
-    console.log("Updated Many Users:", JSON.stringify(updatedUsers, null, 2));
-  } catch (err: any) {
-    console.error("Error bulk updating users:", err.message);
-  }
-
-  console.log("\n=== Testing hardDeleteOne ===");
-  try {
-    const isDeleted = await userRepo.hardDeleteOne(193, "admin");
-    console.log("Hard Deleted User 193:", isDeleted);
-  } catch (err: any) {
-    console.error("Error hard deleting user:", err.message);
-  }
-
-  console.log("\n=== Testing hardDeleteMany ===");
-  try {
-    const deletedCount = await userRepo.hardDeleteMany({
-      email: { $like: "Cierra_Hackett%" }
-    } as any, "admin");
-    console.log("Hard Deleted Many Users Count:", deletedCount);
-  } catch (err: any) {
-    console.error("Error bulk hard deleting users:", err.message);
   }
 }
