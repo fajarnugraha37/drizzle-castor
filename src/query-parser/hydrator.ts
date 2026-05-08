@@ -1,6 +1,6 @@
 import { resolveRelationPath } from "./metadata-explorer";
 import { generateAliasName } from "./alias-manager";
-import { assertSafeKey } from "./security";
+import { assertSafeKey } from "../helper";
 
 /**
  * Utility to unflatten an object with dot-notation keys.

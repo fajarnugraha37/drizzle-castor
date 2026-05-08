@@ -1,4 +1,5 @@
-import { buildSearchQueries, hydrateResults, injectSoftDeleteFilter } from "../query-parser";
+import { buildSearchQueries, hydrateResults } from "../query-parser";
+import { injectSoftDeleteFilter } from "../helper";
 import { getTableColumns } from "drizzle-orm";
 import type { MiddlewareContext } from "../middleware/index";
 

@@ -1,5 +1,5 @@
-import { buildSearchQueries, hydrateResults, parseUpdateSet, injectSoftDeleteFilter, isFilterSimple, parseFilter, buildExistsCondition } from "../query-parser";
-import { getPrimaryKeyColumnName } from "./create";
+import { buildSearchQueries, hydrateResults, parseUpdateSet, isFilterSimple, parseFilter, buildExistsCondition } from "../query-parser";
+import { getPrimaryKeyColumnName, injectSoftDeleteFilter } from "../helper";
 import type { MiddlewareContext } from "../middleware/index";
 
 export async function executeUpdateOne(

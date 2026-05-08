@@ -1,6 +1,6 @@
 import { SQL, sql, getTableColumns } from "drizzle-orm";
 import { getTableName } from "drizzle-orm";
-import { assertSafeKey } from "./security";
+import { assertSafeKey } from "../helper";
 import { ColumnNotFoundError, SecurityError } from "../errors";
 
 /**

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { buildSearchQueries, hydrateResults, isFilterSimple, parseFilter, buildExistsCondition } from "../query-parser";
-import { getPrimaryKeyColumnName } from "./create";
+import { getPrimaryKeyColumnName } from "../helper";
 import type { MiddlewareContext } from "../middleware/index";
 
 export async function executeHardDeleteOne(
