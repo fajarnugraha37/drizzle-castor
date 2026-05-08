@@ -22,6 +22,13 @@
       "when": 1778192473400,
       "tag": "0002_faithful_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1778212132977,
+      "tag": "0003_legal_adam_destine",
+      "breakpoints": true
     }
   ]
 }

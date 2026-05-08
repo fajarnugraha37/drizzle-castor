@@ -24,6 +24,8 @@ export const usersTable = sqliteTable("users", {
     };
   }>(),
   companyId: int("company_id").references(() => companiesTable.id),
+  zipCode: text("zip_code"),
+  stringId: text("string_id"),
 
   createdAt: int("created_at").$default(() => Date.now()),
   createdBy: text("created_by").default("system"),

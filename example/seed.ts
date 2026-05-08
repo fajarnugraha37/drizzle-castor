@@ -77,6 +77,8 @@ export async function seed(args?: string[]) {
             ),
           },
           companyId: randomCompany.id,
+          zipCode: faker.location.zipCode(),
+          stringId: faker.string.numeric(5),
         })
         .returning()
         .get();
