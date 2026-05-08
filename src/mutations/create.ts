@@ -49,9 +49,9 @@ export async function executeCreateOne(
     pageSize: 1
   };
   
-  const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
+  const { mainQuery, paths } = await buildSearchQueries(query as any, translatorContext, true);
   const rawRows = await mainQuery;
-  const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
+  const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
   
   const entity = hydratedData.length > 0 ? hydratedData[0] : null;
 

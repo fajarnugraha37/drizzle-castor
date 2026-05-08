@@ -26,9 +26,9 @@ export async function executeHardDeleteOne(
   let entitiesToDelete: any[] = [];
   if (hooks?.afterHardDelete) {
     const query = { filter, page: 1, pageSize: 1 };
-    const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
+    const { mainQuery, paths } = await buildSearchQueries(query as any, translatorContext, true);
     const rawRows = await mainQuery;
-    entitiesToDelete = hydrateResults(rawRows, baseTableName, metadata, pkName);
+    entitiesToDelete = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
   }
 
   const pkColumn = baseTable[pkName];
@@ -64,9 +64,9 @@ export async function executeHardDeleteMany(
   // Fetch full entities BEFORE deletion if hooks exist (Using original filter natively via joins/exists)
   let entitiesToDelete: any[] = [];
   if (hooks?.afterHardDelete) {
-    const { mainQuery } = await buildSearchQueries({ filter } as any, translatorContext, false);
+    const { mainQuery, paths } = await buildSearchQueries({ filter } as any, translatorContext, false);
     const rawRows = await mainQuery;
-    entitiesToDelete = hydrateResults(rawRows, baseTableName, metadata, pkName);
+    entitiesToDelete = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
     
     if (entitiesToDelete.length === 0) return 0;
   }

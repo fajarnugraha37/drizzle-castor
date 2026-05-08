@@ -51,9 +51,9 @@ export async function executeSoftDeleteOne(
 
   if (hooks?.afterSoftDelete) {
     const query = { filter, page: 1, pageSize: 1 };
-    const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
+    const { mainQuery, paths } = await buildSearchQueries(query as any, translatorContext, true);
     const rawRows = await mainQuery;
-    const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
+    const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
     await hooks.afterSoftDelete(hydratedData);
   }
 
@@ -116,9 +116,9 @@ export async function executeSoftDeleteMany(
       filter,
     }, metadata, baseTableName, "deleted");
 
-    const { mainQuery: hydrationQuery } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
+    const { mainQuery: hydrationQuery, paths } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
     const hydratedRows = await hydrationQuery;
-    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName);
+    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName, paths);
     
     await hooks.afterSoftDelete(hydratedData);
     if (deletedCount === -1) deletedCount = hydratedData.length;
@@ -168,9 +168,9 @@ export async function executeRestoreOne(
 
   if (hooks?.afterRestore) {
     const query = { filter, page: 1, pageSize: 1 };
-    const { mainQuery } = await buildSearchQueries(query as any, translatorContext, true);
+    const { mainQuery, paths } = await buildSearchQueries(query as any, translatorContext, true);
     const rawRows = await mainQuery;
-    const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
+    const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
     await hooks.afterRestore(hydratedData);
   }
 
@@ -233,9 +233,9 @@ export async function executeRestoreMany(
       filter,
     }, metadata, baseTableName, "active");
 
-    const { mainQuery: hydrationQuery } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
+    const { mainQuery: hydrationQuery, paths } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
     const hydratedRows = await hydrationQuery;
-    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName);
+    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName, paths);
     
     await hooks.afterRestore(hydratedData);
     if (restoredCount === -1) restoredCount = hydratedData.length;

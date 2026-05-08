@@ -224,5 +224,6 @@ export async function buildSearchQueries<T>(
     cteQuery: cteQb,
     mainQuery: mainQb,
     countQuery: countQb,
+    paths: Array.from(paths.outerPaths),
   };
 }

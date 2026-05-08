@@ -1,4 +1,5 @@
 import { resolveRelationPath } from "./metadata-explorer";
+import { generateAliasName } from "./alias-manager";
 
 /**
  * Utility to unflatten an object with dot-notation keys.
@@ -46,8 +47,15 @@ export function hydrateResults(
   baseTableName: string,
   metadata: any,
   primaryKeyField: string = "id",
+  paths: string[] = []
 ): any[] {
   const rootMap = new Map<any, any>();
+
+  // Build inverse map from exact alias name to original path
+  const aliasToPath = new Map<string, string>();
+  for (const path of paths) {
+    aliasToPath.set(generateAliasName(path), path);
+  }
 
   for (const row of rows) {
     const rawBaseObj = row[baseTableName];
@@ -72,12 +80,14 @@ export function hydrateResults(
 
       const data = unflattenAndParseJson(rawData);
 
-      // Extract original path from alias (e.g., "rel_posts_comments" -> "posts.comments")
-      // Warning: this simple replace might have edge cases if relation names have underscores.
-      // A more robust hydrator would pass down the exact Path -> Alias map.
-      const path = alias.startsWith("rel_")
-        ? alias.substring(4).replace(/_/g, ".")
-        : alias;
+      // Safely resolve the exact path using the alias map
+      let path = aliasToPath.get(alias);
+      if (!path) {
+        // Fallback for custom projections/aliases not strictly tracked in outerPaths
+        path = alias.startsWith("rel_")
+          ? alias.substring(4).replace(/_/g, ".")
+          : alias;
+      }
 
       try {
         const nodes = resolveRelationPath(metadata, baseTableName, path);

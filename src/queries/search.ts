@@ -1,5 +1,6 @@
 import { buildSearchQueries, hydrateResults, type TranslatorContext } from "../query-parser";
 import type { DbAction, SoftDeleteConfig } from "../types";
+import { getTableColumns } from "drizzle-orm";
 
 /**
  * Resolves static values, synchronous functions, or asynchronous promises
@@ -87,11 +88,15 @@ export async function executeSearchOne(
     await hooks.beforeSearch(query);
   }
 
+  const { tables, baseTableName } = translatorContext;
+  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
+  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+
   const q = await injectSoftDeleteFilter({ ...query, page: 1, pageSize: 1 }, translatorContext.metadata, tableName, "active");
-  const { mainQuery } = await buildSearchQueries(q as any, translatorContext, true);
+  const { mainQuery, paths } = await buildSearchQueries(q as any, translatorContext, true);
 
   const rawRows = await mainQuery;
-  const data = hydrateResults(rawRows, tableName, translatorContext.metadata);
+  const data = hydrateResults(rawRows, tableName, translatorContext.metadata, pkName, paths);
 
   if (hooks?.afterSearch) {
     await hooks.afterSearch(query, data);
@@ -116,9 +121,13 @@ export async function executeSearchPage(
     await hooks.beforeSearch(query);
   }
 
+  const { tables, baseTableName } = translatorContext;
+  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
+  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+
   const q = await injectSoftDeleteFilter(query, translatorContext.metadata, tableName, "active");
 
-  const { mainQuery, countQuery } = await buildSearchQueries(
+  const { mainQuery, countQuery, paths } = await buildSearchQueries(
     q as any,
     translatorContext,
     true,
@@ -140,7 +149,7 @@ export async function executeSearchPage(
   }
 
   const rawRows = await mainQuery;
-  const data = hydrateResults(rawRows, tableName, translatorContext.metadata);
+  const data = hydrateResults(rawRows, tableName, translatorContext.metadata, pkName, paths);
 
   if (hooks?.afterSearch) {
     await hooks.afterSearch(query, data);
@@ -166,16 +175,20 @@ export async function executeSearchMany(
     await hooks.beforeSearch(query);
   }
 
+  const { tables, baseTableName } = translatorContext;
+  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
+  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+
   const q = await injectSoftDeleteFilter(query, translatorContext.metadata, tableName, "active");
 
-  const { mainQuery } = await buildSearchQueries(
+  const { mainQuery, paths } = await buildSearchQueries(
     q as any,
     translatorContext,
     false,
   );
 
   const rawRows = await mainQuery;
-  const data = hydrateResults(rawRows, tableName, translatorContext.metadata);
+  const data = hydrateResults(rawRows, tableName, translatorContext.metadata, pkName, paths);
 
   if (hooks?.afterSearch) {
     await hooks.afterSearch(query, data);
@@ -194,11 +207,15 @@ export async function executeSearchDeletedOne(
 ) {
   checkAccess("read", profile);
 
+  const { tables, baseTableName } = translatorContext;
+  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
+  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+
   const q = await injectSoftDeleteFilter({ ...query, page: 1, pageSize: 1 }, translatorContext.metadata, tableName, "deleted");
-  const { mainQuery } = await buildSearchQueries(q as any, translatorContext, true);
+  const { mainQuery, paths } = await buildSearchQueries(q as any, translatorContext, true);
 
   const rawRows = await mainQuery;
-  const data = hydrateResults(rawRows, tableName, translatorContext.metadata);
+  const data = hydrateResults(rawRows, tableName, translatorContext.metadata, pkName, paths);
 
   return data.length > 0 ? data[0] : null;
 }
@@ -215,9 +232,13 @@ export async function executeSearchDeletedPage(
   const page = query.page ?? 1;
   const pageSize = query.pageSize ?? 10;
 
+  const { tables, baseTableName } = translatorContext;
+  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
+  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+
   const q = await injectSoftDeleteFilter(query, translatorContext.metadata, tableName, "deleted");
 
-  const { mainQuery, countQuery } = await buildSearchQueries(
+  const { mainQuery, countQuery, paths } = await buildSearchQueries(
     q as any,
     translatorContext,
     true,
@@ -235,7 +256,7 @@ export async function executeSearchDeletedPage(
   }
 
   const rawRows = await mainQuery;
-  const data = hydrateResults(rawRows, tableName, translatorContext.metadata);
+  const data = hydrateResults(rawRows, tableName, translatorContext.metadata, pkName, paths);
 
   return {
     data,
@@ -253,14 +274,18 @@ export async function executeSearchDeletedMany(
 ) {
   checkAccess("read", profile);
 
+  const { tables, baseTableName } = translatorContext;
+  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
+  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+
   const q = await injectSoftDeleteFilter(query, translatorContext.metadata, tableName, "deleted");
 
-  const { mainQuery } = await buildSearchQueries(
+  const { mainQuery, paths } = await buildSearchQueries(
     q as any,
     translatorContext,
     false,
   );
 
   const rawRows = await mainQuery;
-  return hydrateResults(rawRows, tableName, translatorContext.metadata);
+  return hydrateResults(rawRows, tableName, translatorContext.metadata, pkName, paths);
 }
