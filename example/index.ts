@@ -1,11 +1,13 @@
 import "bun";
 import { seed } from "./modules/seed";
-import { schemaMetadata } from "./modules/helper";
+import { schemaMetadataBuilder } from "./modules/helper";
 import { createExample } from "./modules/create.example";
 import { updateExample } from "./modules/update.example";
 import { readExample } from "./modules/read.example";
 import { hardDeleteExample } from "./modules/hard-delete.example";
 import { softDeleteExample } from "./modules/soft-delete.example";
+import { isQueryError, isSecurityError } from "../src";
+import { Middleware } from "../dist";
 
 {
   const [, , command, subCommand, ...args] = process.argv;
@@ -55,7 +57,20 @@ import { softDeleteExample } from "./modules/soft-delete.example";
 }
 
 async function playground() {
-  const userRepo = schemaMetadata.repoFactory("users", {
+  let middlewareFired = false;
+  const customMiddleware: Middleware = async (ctx, next) => {
+    if (ctx.action === "read" && ctx.tableName === "users") {
+      console.log(`[Custom Middleware] Intercepted ${ctx.action} action on ${ctx.tableName} table with params:`, ctx.params);
+      middlewareFired = true;
+    }
+    return next();
+  };
+
+  const builder = schemaMetadataBuilder
+    .use(customMiddleware)
+    .build();
+
+  const userRepo = builder.repoFactory("users", {
     default: {
       allowedProjections: ["*"],
       allowedFilters: ["*"],
@@ -69,6 +84,85 @@ async function playground() {
       allowedSorts: ["*"],
     },
   });
+
+  const one = await userRepo.searchOne({
+    projection: [
+      'name',
+      'persona.skills.0',
+      'settings.theme',
+      // 'occupational.period.start',
+      // 'posts.title',
+      // 'posts.comments.content',
+    ],
+    filter: {
+      'persona.skills.0': { $eq: "TypeScript" },
+    },
+    order: {
+      'persona.skills.0': 'desc'
+    }
+  });
+  console.log("result: ", one);
+
+  console.log("\n--- Testing Edge Case: Unvalidated Key Access (BUG-2) ---");
+  try {
+    await userRepo.searchMany({
+      filter: {
+        "toString": { $eq: "1" }
+      }
+    } as any);
+    console.error("❌ FAILED: The unvalidated key access did not throw an error.");
+  } catch (error: any) {
+    if (isQueryError(error) && error.message.includes("not found on table")) {
+      console.log("✅ PASSED: Safely rejected invalid key access ('toString') with ColumnNotFoundError.");
+    } else {
+      console.error("❌ FAILED: Threw an unexpected error type:", error);
+    }
+  }
+
+  try {
+    await userRepo.searchMany({
+      filter: {
+        "hasOwnProperty": { $eq: "1" }
+      }
+    } as any);
+    console.error("❌ FAILED: The unvalidated key access did not throw an error.");
+  } catch (error: any) {
+    if (isQueryError(error) && error.message.includes("not found on table")) {
+      console.log("✅ PASSED: Safely rejected invalid key access ('hasOwnProperty') with ColumnNotFoundError.");
+    } else {
+      console.error("❌ FAILED: Threw an unexpected error type:", error);
+    }
+  }
+
+  console.log("\n--- Testing RBAC Custom Errors ---");
+  try {
+    // Calling with a non-existent profile
+    await userRepo.searchMany({}, "hacker_profile" as any);
+    console.error("❌ FAILED: The unvalidated profile did not throw an error.");
+  } catch (error: any) {
+    if (isSecurityError(error) && error.code === "ACCESS_DENIED") {
+      console.log("✅ PASSED: Safely caught AccessDeniedError using isSecurityError utility.");
+    } else {
+      console.error("❌ FAILED: Threw an unexpected error:", error);
+    }
+  }
+
+  console.log("\n--- Testing Edge Case: JSON Array Extraction ---");
+  const jsonArrayResult = await userRepo.searchOne({
+    projection: [
+      "name",
+      "persona.skills.0",
+      "settings.theme",
+      "occupational.period.start",
+    ],
+    filter: {
+      "persona.skills.0": { $eq: "java" },
+    },
+    order: {
+      "persona.skills.0": "desc",
+    },
+  });
+  console.log("JSON Array Extraction Result:", JSON.stringify(jsonArrayResult, null, 2));
 
   console.log("\n--- Playground Test Finished ---");
 }

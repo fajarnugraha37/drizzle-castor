@@ -1,7 +1,7 @@
 import { getTableColumns } from "drizzle-orm";
-import { buildSearchQueries, hydrateResults, type TranslatorContext } from "../query-parser";
-import type { DbAction } from "../types";
+import { buildSearchQueries, hydrateResults } from "../query-parser";
 import { MutationError } from "../errors";
+import type { MiddlewareContext } from "../middleware/index";
 
 /**
  * Extracts the primary key column name from a Drizzle table.
@@ -18,23 +18,14 @@ export function getPrimaryKeyColumnName(baseTable: any): string {
 }
 
 export async function executeCreateOne(
-  data: any,
-  checkAccess: (action: DbAction, profile?: string | string[]) => void,
-  profile: string | string[] | undefined,
-  hooks: any,
-  translatorContext: TranslatorContext,
+  ctx: MiddlewareContext,
   baseTable: any,
 ) {
-  checkAccess("create", profile);
-
-  if (hooks?.beforeCreate) {
-    await hooks.beforeCreate(data);
-  }
-
+  const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
   
   // Execute insert
-  const insertResult = await db.insert(baseTable).values(data).returning();
+  const insertResult = await db.insert(baseTable).values(params.data).returning();
   
   if (!insertResult || insertResult.length === 0) {
     throw new MutationError(`Failed to insert record into table '${baseTableName}'`);
@@ -54,35 +45,20 @@ export async function executeCreateOne(
   const rawRows = await mainQuery;
   const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
   
-  const entity = hydratedData.length > 0 ? hydratedData[0] : null;
-
-  if (hooks?.afterCreate && entity) {
-    await hooks.afterCreate(entity);
-  }
-
-  return entity;
+  return hydratedData.length > 0 ? hydratedData[0] : null;
 }
 
 export async function executeCreateMany(
-  data: any[],
-  checkAccess: (action: DbAction, profile?: string | string[]) => void,
-  profile: string | string[] | undefined,
-  hooks: any,
-  translatorContext: TranslatorContext,
+  ctx: MiddlewareContext,
   baseTable: any,
 ) {
-  checkAccess("create", profile);
-
-  if (!data || data.length === 0) return [];
-
-  if (hooks?.beforeCreate) {
-    await hooks.beforeCreate(data);
-  }
-
+  const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
+
+  if (!params.data || params.data.length === 0) return [];
   
   // Execute batch insert
-  const insertResult = await db.insert(baseTable).values(data).returning();
+  const insertResult = await db.insert(baseTable).values(params.data).returning();
   
   if (!insertResult || insertResult.length === 0) {
     throw new MutationError(`Failed to insert records into table '${baseTableName}'`);
@@ -98,11 +74,6 @@ export async function executeCreateMany(
   
   const { mainQuery } = await buildSearchQueries(query as any, translatorContext, false);
   const rawRows = await mainQuery;
-  const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
-
-  if (hooks?.afterCreate) {
-    await hooks.afterCreate(hydratedData);
-  }
-
-  return hydratedData;
+  
+  return hydrateResults(rawRows, baseTableName, metadata, pkName);
 }

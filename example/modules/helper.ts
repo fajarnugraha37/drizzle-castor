@@ -59,7 +59,7 @@ export const db = drizzle(getDatabaseFileLocation(), {
   }),
 });
 
-export const schemaMetadata = createSchemaBuilder(db, [
+export const schemaMetadataBuilder = createSchemaBuilder(db, [
   companiesTable,
   usersTable,
   profilesTable,
@@ -116,56 +116,56 @@ export const schemaMetadata = createSchemaBuilder(db, [
     },
     hooks: {
       beforeSearch: async (query): Promise<void> => {
-        // console.log(`[Hooks] Before search hook triggered`);
+        console.log(`[Hooks] Before search hook triggered`);
         // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
       },
       afterSearch: async (query, result): Promise<void> => {
-        // console.log(`[Hooks] After search hook triggered`);
+        console.log(`[Hooks] After search hook triggered`);
         // console.log(`[Hooks] After search hook triggered for users with query:`, query);
         // console.log(`[Hooks] Search result:`, result[0]?.name);
       },
       beforeCreate: async (data): Promise<void> => {
-        // console.log(`[Hooks] Before create hook triggered`);
+        console.log(`[Hooks] Before create hook triggered`);
         // console.log(`[Hooks] Before create hook triggered for users with data:`, data);
       },
       afterCreate: async (data): Promise<void> => {
-        // console.log(`[Hooks] After create hook triggered`);
+        console.log(`[Hooks] After create hook triggered`);
         // console.log(`[Hooks] After create hook triggered for users with data:`, data);
         // console.log(`[Hooks] Created user:`, result.name);
       },
       beforeUpdate: async (filter, data): Promise<void> => {
-        // console.log(`[Hooks] Before update hook triggered`);
+        console.log(`[Hooks] Before update hook triggered`);
         // console.log(`[Hooks] Before update hook triggered for users with filter:`, filter, `and data:`, data);
       },
       afterUpdate: async (data, result): Promise<void> => {
-        // console.log(`[Hooks] After update hook triggered`);
+        console.log(`[Hooks] After update hook triggered`);
         // console.log(`[Hooks] After update hook triggered for users with filter:`, filter, `and data:`, data);
         // console.log(`[Hooks] Updated user:`, result[0]?.name);
       },
       beforeSoftDelete: async (filter): Promise<void> => {
-        // console.log(`[Hooks] Before soft delete hook triggered`);
+        console.log(`[Hooks] Before soft delete hook triggered`);
         // console.log(`[Hooks] Before soft delete hook triggered for users with filter:`, filter);
       },
       afterSoftDelete: async (filter): Promise<void> => {
-        // console.log(`[Hooks] After soft delete hook triggered`);
+        console.log(`[Hooks] After soft delete hook triggered`);
         // console.log(`[Hooks] After soft delete hook triggered for users with filter:`, filter);
         // console.log(`[Hooks] Soft deleted user:`, result[0]?.name);
       },
       beforeRestore: async (filter): Promise<void> => {
-        // console.log(`[Hooks] Before restore hook triggered`);
+        console.log(`[Hooks] Before restore hook triggered`);
         // console.log(`[Hooks] Before restore hook triggered for users with filter:`, filter);
       },
       afterRestore: async (result): Promise<void> => {
-        // console.log(`[Hooks] After restore hook triggered`);
+        console.log(`[Hooks] After restore hook triggered`);
         // console.log(`[Hooks] After restore hook triggered for users with filter:`, filter);
         // console.log(`[Hooks] Restored user:`, result[0]?.name);
       },
       beforeHardDelete: async (filter): Promise<void> => {
-        // console.log(`[Hooks] Before hard delete hook triggered`);
+        console.log(`[Hooks] Before hard delete hook triggered`);
         // console.log(`[Hooks] Before hard delete hook triggered for users with filter:`, filter);
       },
       afterHardDelete: async (result): Promise<void> => {
-        // console.log(`[Hooks] After hard delete hook triggered`);
+        console.log(`[Hooks] After hard delete hook triggered`);
         // console.log(`[Hooks] After hard delete hook triggered for users with filter:`, filter);
         // console.log(`[Hooks] Hard deleted user:`, result[0]?.name);
       },
@@ -263,5 +263,6 @@ export const schemaMetadata = createSchemaBuilder(db, [
         foreignKey: "users.id",
       },
     ],
-  })
-  .build();
+  });
+
+export const schemaMetadata = schemaMetadataBuilder.build();

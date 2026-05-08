@@ -5,17 +5,26 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany, executeRestoreOne, executeRestoreMany } from "./mutations/soft-delete";
 import { getTableName } from "drizzle-orm";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
-import { AccessDeniedError } from "./errors";
+import { composeMiddleware, createRbacMiddleware, createHooksMiddleware } from "./middleware/exports";
+import type { Middleware, MiddlewareContext } from "./middleware/index";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],
->(db: TDb, tables: TTables, mode: "strict" | "lenient" = "lenient") {
+>(
+  db: TDb, 
+  tables: TTables, 
+  mode: "strict" | "lenient" = "lenient",
+  globalMiddlewares: Middleware[] = []
+) {
   if (mode === "lenient") {
     console.warn(
       "[Drizzle-Castor] Warning: Running in lenient mode. Unprotected tables will allow all actions by default.",
     );
   }
+
+  const rbacMiddleware = createRbacMiddleware(mode);
+  const hooksMiddleware = createHooksMiddleware();
 
   return function <const TMetadata extends TSchemaMetadata<TDb, TTables>>(
     metadata: TMetadata,
@@ -38,59 +47,32 @@ export function defineSchemaMetadata<
         baseTableName: tableName,
       };
 
-      const checkAccess = (
-        action: DbAction,
-        requestedProfile?: string | string[],
-      ) => {
-        const tableConfig = (metadata as any)[tableName];
+      const tableConfig = (metadata as any)[tableName] || {};
+      const tableMiddlewares = tableConfig.middlewares || [];
 
-        if (
-          !tableConfig ||
-          !tableConfig.profiles ||
-          Object.keys(tableConfig.profiles).length === 0
-        ) {
-          if (mode === "lenient") return; // Allow by default in lenient mode
-          throw new AccessDeniedError(
-            `[Access Denied] Table '${tableName}' has no profiles defined in strict mode.`,
-          );
-        }
+      // Stack: Global -> Table Specific -> Hooks -> RBAC -> Core Action
+      const pipeline = composeMiddleware([
+        ...globalMiddlewares,
+        ...tableMiddlewares,
+        hooksMiddleware,
+        rbacMiddleware
+      ]);
 
-        const profilesToCheck = requestedProfile
-          ? Array.isArray(requestedProfile)
-            ? requestedProfile
-            : [requestedProfile]
-          : ["default"];
+      const baseTable = tables.find((t) => getTableName(t) === tableName);
 
-        if (profilesToCheck.length === 0) {
-          profilesToCheck.push("default");
-        }
-
-        let hasAccess = false;
-        let missingProfiles: string[] = [];
-
-        for (const profileName of profilesToCheck) {
-          const allowedActions = tableConfig.profiles[profileName];
-          if (!allowedActions) {
-            missingProfiles.push(profileName);
-            continue;
-          }
-          if (allowedActions.includes(action)) {
-            hasAccess = true;
-            break;
-          }
-        }
-
-        if (!hasAccess) {
-          const profileStr = profilesToCheck.join(", ");
-          if (missingProfiles.length === profilesToCheck.length) {
-            throw new AccessDeniedError(
-              `[Access Denied] None of the profiles '${profileStr}' are defined for table '${tableName}'.`,
-            );
-          }
-          throw new AccessDeniedError(
-            `[Access Denied] Action '${action}' is denied for profiles '${profileStr}' on table '${tableName}'.`,
-          );
-        }
+      const executeWithMiddleware = (action: DbAction, profile: any, params: any, coreFn: any) => {
+        const ctx: MiddlewareContext = {
+          action,
+          tableName,
+          profile,
+          params,
+          translatorContext,
+          state: {}
+        };
+        
+        return pipeline(ctx, async () => {
+          return coreFn(ctx);
+        });
       };
 
       return {
@@ -102,94 +84,84 @@ export function defineSchemaMetadata<
         defineInsertValue: (i) => i,
 
         createOne: async (data, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeCreateOne(data, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("create", profile, { data }, (ctx: MiddlewareContext) => 
+            executeCreateOne(ctx, baseTable)
+          );
         },
         createMany: async (data, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeCreateMany(data, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("create", profile, { data }, (ctx: MiddlewareContext) => 
+            executeCreateMany(ctx, baseTable)
+          );
         },
         searchOne: async (query, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          return executeSearchOne(query, checkAccess, profile as any, hooks, translatorContext, tableName);
+           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+            executeSearchOne(ctx)
+          );
         },
         searchPage: async (query, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          return executeSearchPage(query, checkAccess, profile as any, hooks, translatorContext, tableName) as any;
+          return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+            executeSearchPage(ctx)
+          );
         },
         searchMany: async (query, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          return executeSearchMany(query, checkAccess, profile as any, hooks, translatorContext, tableName);
+           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+            executeSearchMany(ctx)
+          );
         },
         searchDeletedOne: async (query, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          return executeSearchDeletedOne(query, checkAccess, profile as any, hooks, translatorContext, tableName);
+          return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+            executeSearchDeletedOne(ctx)
+          );
         },
         searchDeletedPage: async (query, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          return executeSearchDeletedPage(query, checkAccess, profile as any, hooks, translatorContext, tableName) as any;
+           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+            executeSearchDeletedPage(ctx)
+          );
         },
         searchDeletedMany: async (query, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          return executeSearchDeletedMany(query, checkAccess, profile as any, hooks, translatorContext, tableName);
+           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+            executeSearchDeletedMany(ctx)
+          );
         },
         updateOne: async (id, set, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeUpdateOne(id, set, checkAccess, profile as any, hooks, translatorContext, baseTable);
+           return executeWithMiddleware("update", profile, { id, set }, (ctx: MiddlewareContext) => 
+            executeUpdateOne(ctx, baseTable)
+          );
         },
         updateMany: async (filter, set, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeUpdateMany(filter, set, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("update", profile, { filter, set }, (ctx: MiddlewareContext) => 
+            executeUpdateMany(ctx, baseTable)
+          );
         },
         softDeleteOne: async (id, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeSoftDeleteOne(id, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("softDelete", profile, { id }, (ctx: MiddlewareContext) => 
+            executeSoftDeleteOne(ctx, baseTable)
+          );
         },
         softDeleteMany: async (filter, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeSoftDeleteMany(filter, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("softDelete", profile, { filter }, (ctx: MiddlewareContext) => 
+            executeSoftDeleteMany(ctx, baseTable)
+          );
         },
         restoreOne: async (id, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeRestoreOne(id, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("restore", profile, { id }, (ctx: MiddlewareContext) => 
+            executeRestoreOne(ctx, baseTable)
+          );
         },
         restoreMany: async (filter, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeRestoreMany(filter, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("restore", profile, { filter }, (ctx: MiddlewareContext) => 
+            executeRestoreMany(ctx, baseTable)
+          );
         },
         hardDeleteOne: async (id, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeHardDeleteOne(id, checkAccess, profile as any, hooks, translatorContext, baseTable);
+           return executeWithMiddleware("hardDelete", profile, { id }, (ctx: MiddlewareContext) => 
+            executeHardDeleteOne(ctx, baseTable)
+          );
         },
         hardDeleteMany: async (filter, profile) => {
-          const tableConfig = (metadata as any)[tableName];
-          const hooks = tableConfig?.hooks;
-          const baseTable = tables.find((t) => getTableName(t) === tableName);
-          return executeHardDeleteMany(filter, checkAccess, profile as any, hooks, translatorContext, baseTable);
+          return executeWithMiddleware("hardDelete", profile, { filter }, (ctx: MiddlewareContext) => 
+            executeHardDeleteMany(ctx, baseTable)
+          );
         },
       };
     };

@@ -3,6 +3,7 @@ import type { InferEntity, FindTable, InferModel } from "./helper";
 import type { FilterQuery } from "./query";
 import type { AnyDatabase, AnyTable } from "./schema-metadata";
 import type { InferInsert, SoftDeleteConfig, DbAction } from "./value";
+import type { Middleware } from "../middleware/index";
 
 // --- HOOKS CONFIGURATION ---
 export type TableHooks<
@@ -53,4 +54,5 @@ export type TableConfig<
     InferModel<FindTable<TSchema["tables"], TTableName>>
   >;
   profiles?: Record<string, readonly DbAction[]>;
+  middlewares?: Middleware[];
 };

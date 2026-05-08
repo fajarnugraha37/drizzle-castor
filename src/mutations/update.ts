@@ -1,32 +1,24 @@
-import { buildSearchQueries, hydrateResults, parseUpdateSet, injectSoftDeleteFilter, isFilterSimple, parseFilter, buildExistsCondition, type TranslatorContext } from "../query-parser";
-import type { DbAction } from "../types";
+import { buildSearchQueries, hydrateResults, parseUpdateSet, injectSoftDeleteFilter, isFilterSimple, parseFilter, buildExistsCondition } from "../query-parser";
 import { getPrimaryKeyColumnName } from "./create";
+import type { MiddlewareContext } from "../middleware/index";
 
 export async function executeUpdateOne(
-  id: string | number,
-  setParams: any,
-  checkAccess: (action: DbAction, profile?: string | string[]) => void,
-  profile: string | string[] | undefined,
-  hooks: any,
-  translatorContext: TranslatorContext,
+  ctx: MiddlewareContext,
   baseTable: any,
 ) {
-  checkAccess("update", profile);
-
+  const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
   const pkName = getPrimaryKeyColumnName(baseTable);
 
-  if (hooks?.beforeUpdate) {
-    await hooks.beforeUpdate(setParams, { [pkName]: { $eq: id } });
-  }
+  if (!params.set) return null;
 
   // ATOMIC UPDATE: Combine soft delete check and ID check in a single WHERE clause
   const searchQuery = await injectSoftDeleteFilter({
-    filter: { [pkName]: { $eq: id } },
+    filter: { [pkName]: { $eq: params.id } },
   }, metadata, baseTableName, "active");
 
   const whereAst = parseFilter(searchQuery.filter, baseTable, new Map(), metadata, baseTableName, db);
-  const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
+  const parsedSetParams = parseUpdateSet(db, baseTable, params.set);
 
   const updateResult = await db
     .update(baseTable)
@@ -38,9 +30,9 @@ export async function executeUpdateOne(
     return null; // Record not found or it is soft-deleted
   }
 
-  // Re-hydrate the updated record using query-parser (only if needed for return or hooks)
+  // Re-hydrate the updated record using query-parser
   const query = {
-    filter: { [pkName]: { $eq: id } },
+    filter: { [pkName]: { $eq: params.id } },
     page: 1,
     pageSize: 1,
   };
@@ -49,41 +41,27 @@ export async function executeUpdateOne(
   const rawRows = await mainQuery;
   const hydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName);
 
-  const entity = hydratedData.length > 0 ? hydratedData[0] : null;
-
-  if (hooks?.afterUpdate && entity) {
-    await hooks.afterUpdate(setParams, [entity]);
-  }
-
-  return entity;
+  return hydratedData.length > 0 ? hydratedData[0] : null;
 }
 
 export async function executeUpdateMany(
-  filter: any,
-  setParams: any,
-  checkAccess: (action: DbAction, profile?: string | string[]) => void,
-  profile: string | string[] | undefined,
-  hooks: any,
-  translatorContext: TranslatorContext,
+  ctx: MiddlewareContext,
   baseTable: any,
 ) {
-  checkAccess("update", profile);
-
-  if (hooks?.beforeUpdate) {
-    await hooks.beforeUpdate(setParams, filter);
-  }
-
+  const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
   const pkName = getPrimaryKeyColumnName(baseTable);
   const pkColumn = baseTable[pkName];
 
+  if (!params.set) return [];
+
   // Step 1: Inject soft delete filter
   const searchQuery = await injectSoftDeleteFilter({
-    filter,
+    filter: params.filter,
     projection: [pkName],
   }, metadata, baseTableName, "active");
 
-  const parsedSetParams = parseUpdateSet(db, baseTable, setParams);
+  const parsedSetParams = parseUpdateSet(db, baseTable, params.set);
 
   let affectedIds: any[] = [];
 
@@ -112,20 +90,12 @@ export async function executeUpdateMany(
     return [];
   }
 
-  // Step 3: Re-hydrate updated records ONLY if hooks exist, WITHOUT using IN clauses
-  if (hooks?.afterUpdate) {
-    // We use the exact same filter to retrieve the updated data natively via SQL JOINS/EXISTS
-    const rehydrateSearchQuery = await injectSoftDeleteFilter({
-      filter,
-    }, metadata, baseTableName, "active");
+  // We use the exact same filter to retrieve the updated data natively via SQL JOINS/EXISTS
+  const rehydrateSearchQuery = await injectSoftDeleteFilter({
+    filter: params.filter,
+  }, metadata, baseTableName, "active");
 
-    const { mainQuery: hydrationQuery } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
-    const hydratedRows = await hydrationQuery;
-    const hydratedData = hydrateResults(hydratedRows, baseTableName, metadata, pkName);
-
-    await hooks.afterUpdate(setParams, hydratedData);
-    return hydratedData;
-  }
-
-  return affectedIds.map(id => ({ [pkName]: id }));
+  const { mainQuery: hydrationQuery } = await buildSearchQueries(rehydrateSearchQuery as any, translatorContext, false);
+  const hydratedRows = await hydrationQuery;
+  return hydrateResults(hydratedRows, baseTableName, metadata, pkName);
 }
