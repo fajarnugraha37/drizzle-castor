@@ -26,10 +26,8 @@ export type ColumnName<T extends AnyTable> = Extract<
 >;
 export type ColumnPath<T extends AnyTable> = `${TableName<T>}.${ColumnName<T>}`;
 
-// 1. Ubah StrictRelations: Tambahkan 'readonly' di setiap array
-// Ini agar parameter <const TMetadata> yang sifatnya deep-readonly tidak error
 export type StrictRelations<
-  TAllTables extends AnyTable, // Ubah ke AnyPgTable/AnyMySqlTable jika pakai Postgres/MySQL
+  TAllTables extends AnyTable,
   TLocalTable extends TAllTables,
 > = {
   oneToMany?: readonly {
@@ -115,29 +113,18 @@ export type TProfileNames<
   TTables extends readonly AnyTable[],
   TMetadata extends TSchemaMetadata<TDb, TTables>,
   TName extends TTableNames<TDb, TTables, TMetadata>,
-> =
-  TMetadata[TName] extends TableConfig<
-    TSchemaContext<TDb, TTables, TMetadata>,
-    TName
-  >
-    ? keyof TMetadata[TName]["profiles"] & string
-    : never;
+> = TMetadata[TName] extends { profiles: infer P }
+  ? keyof P & string
+  : "default";
 
 export type TProfileOptions<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],
   TMetadata extends TSchemaMetadata<TDb, TTables>,
   TName extends TTableNames<TDb, TTables, TMetadata>,
-> = Partial<
-  {
-    [K in TProfileNames<TDb, TTables, TMetadata, TName>]?: RepoProfileConfig<
-      TSchemaContext<TDb, TTables, TMetadata>,
-      TName
-    >;
-  } & {
-    [key: string]: RepoProfileConfig<
-      TSchemaContext<TDb, TTables, TMetadata>,
-      TName
-    >;
-  }
->;
+> = {
+  [K in TProfileNames<TDb, TTables, TMetadata, TName> | (string & {})]?: RepoProfileConfig<
+    TSchemaContext<TDb, TTables, TMetadata>,
+    TName
+  >;
+};
