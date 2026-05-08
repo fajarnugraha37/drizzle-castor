@@ -6,7 +6,7 @@ import { QueryParsingError } from "./query";
  * Checks if an error is an instance of CastorError
  */
 export function isCastorError(error: any): error is CastorError {
-  return error instanceof CastorError || (error && typeof error === "object" && typeof error.code === "string" && error.name?.endsWith("Error"));
+  return error instanceof CastorError || Boolean(error && typeof error === "object" && typeof error.code === "string" && error.name?.endsWith("Error"));
 }
 
 /**
