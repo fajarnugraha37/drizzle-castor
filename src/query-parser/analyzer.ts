@@ -7,6 +7,20 @@ export type QueryPaths = {
 };
 
 /**
+ * Ensures a relation path and all its intermediate parent paths are added to the Set.
+ * This is crucial for building deep join chains where each level requires the previous alias.
+ */
+function addPathWithParents(paths: Set<string>, relPath: string): void {
+  if (!relPath) return;
+  const segments = relPath.split(".");
+  let current = "";
+  for (const segment of segments) {
+    current = current ? `${current}.${segment}` : segment;
+    paths.add(current);
+  }
+}
+
+/**
  * Extracts the relation path from a full column path by validating against metadata.
  * Returns null if the path does not traverse any table relations.
  */
@@ -58,7 +72,7 @@ export function analyzeQuery<T>(
       const resolution = resolvePathSegments(metadata, baseTableName, path as string);
       const relPath = resolution.relationPath;
       if (relPath) {
-        outerPaths.add(relPath);
+        addPathWithParents(outerPaths, relPath);
       }
     }
   }
@@ -67,7 +81,7 @@ export function analyzeQuery<T>(
 }
 
 export function extractFilterPaths(
-  filter: any, 
+  filter: any,
   paths: Set<string>,
   metadata: any,
   baseTableName: string
@@ -86,13 +100,13 @@ export function extractFilterPaths(
     } else if (!key.startsWith("$")) {
       const relationPath = getRelationPath(key, metadata, baseTableName);
       if (relationPath) {
-        paths.add(relationPath);
+        addPathWithParents(paths, relationPath);
       }
     }
   }
 }
 
-function extractOrderPaths(
+export function extractOrderPaths(
   order: any,
   paths: Set<string>,
   metadata: any,
@@ -104,7 +118,7 @@ function extractOrderPaths(
   for (const [key, value] of Object.entries(order)) {
     const relationPath = getRelationPath(key, metadata, baseTableName);
     if (relationPath) {
-      paths.add(relationPath);
+      addPathWithParents(paths, relationPath);
     }
     onField(key, value);
   }
