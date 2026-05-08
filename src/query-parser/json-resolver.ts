@@ -90,7 +90,8 @@ export function parseUpdateSet(
       mutationSql = sql`COALESCE(${mutationSql}, JSON_OBJECT())`;
       const args = mutations.flatMap(mut => {
         const formattedPath = formatSqliteMysqlPath(mut.path);
-        return [sql`'$.${sql.raw(formattedPath)}'`, sql`CAST(${JSON.stringify(mut.value)} AS JSON)`];
+        const fullPath = `$.${formattedPath}`;
+        return [sql`${fullPath}`, sql`CAST(${JSON.stringify(mut.value)} AS JSON)`];
       });
       mutationSql = sql`JSON_SET(${mutationSql}, ${sql.join(args, sql`, `)})`;
     } else {
@@ -98,7 +99,8 @@ export function parseUpdateSet(
       mutationSql = sql`COALESCE(${mutationSql}, '{}')`;
       const args = mutations.flatMap(mut => {
         const formattedPath = formatSqliteMysqlPath(mut.path);
-        return [sql`'$.${sql.raw(formattedPath)}'`, sql`json(${JSON.stringify(mut.value)})`];
+        const fullPath = `$.${formattedPath}`;
+        return [sql`${fullPath}`, sql`json(${JSON.stringify(mut.value)})`];
       });
       mutationSql = sql`json_set(${mutationSql}, ${sql.join(args, sql`, `)})`;
     }
