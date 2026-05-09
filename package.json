@@ -44,18 +44,29 @@
     "build": "rm -rf dist && bunx tsc && bunx tsup",
     "test": "bun test --isolate",
     "test:watch": "bun test --isolate --watch",
+    "test:pg": "node --import tsx --test --experimental-test-coverage .\\tests\\integration\\postgresql\\*.test.ts",
+    "test:mysql": "node --import tsx --test --experimental-test-coverage .\\tests\\integration\\mysql\\*.test.ts",
+    "test:sqlite": "bun test ./tests/integration/sqlite/ --isolate",
     "coverage:view": "open coverage/lcov-report/index.html",
     "action:validate": "act --action-offline-mode --workflows ./.github/workflows/validate.yml",
     "action:publish": "act --action-offline-mode --workflows ./.github/workflows/publish.yml --secret-file .secrets"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.4.0",
+    "@testcontainers/mysql": "^11.14.0",
+    "@testcontainers/postgresql": "^11.14.0",
     "@types/bun": "latest",
     "@types/node": "^25.6.0",
+    "@types/pg": "^8.20.0",
     "better-sqlite3": "^12.9.0",
     "drizzle-kit": "^0.31.10",
+    "expect": "^30.4.1",
     "glob": "^13.0.6",
-    "tsup": "^8.5.1"
+    "mysql2": "^3.22.3",
+    "pg": "^8.20.0",
+    "testcontainers": "^11.14.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.21.0"
   },
   "peerDependencies": {
     "typescript": "^5"
