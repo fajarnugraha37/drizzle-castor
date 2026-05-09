@@ -98,9 +98,11 @@ export async function executeSingleMutation(
         whereAst = await buildExistsCondition(effectiveFilter, { ...translatorContext, db: tx }, baseTable);
       }
 
+      const whereClause = whereAst ? sql` WHERE ${whereAst}` : sql``;
+
       await tx.execute(sql`
         INSERT INTO ${tempTableIdent} (${dbColumnIdent})
-        SELECT ${pkColumn} FROM ${baseTable} WHERE ${whereAst}
+        SELECT ${pkColumn} FROM ${baseTable}${whereClause}
       `);
 
       const captureCount = await getTempTableCount(tx, tempTableIdent);
