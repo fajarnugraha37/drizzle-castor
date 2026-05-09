@@ -49,7 +49,7 @@ export function generateTempTableName(): string {
 
 /**
  * Cross-dialect helper to get row count from a result object or a table.
- * Uses explicit normalization based on the detected dialect.
+ * Uses explicit normalization based on the detected dialect and driver variations.
  */
 export async function getTempTableCount(tx: any, tableIdent: any): Promise<number> {
   const result: any = await tx.execute(sql`SELECT COUNT(*) as count FROM ${tableIdent}`);
@@ -61,10 +61,10 @@ export async function getTempTableCount(tx: any, tableIdent: any): Promise<numbe
     // mysql2 returns [rows, fields]
     rows = (Array.isArray(result) && Array.isArray(result[0])) ? result[0] : (Array.isArray(result) ? result : []);
   } else if (dialect === "pg") {
-    // node-postgres returns { rows: [...] }
-    rows = result?.rows || [];
+    // FIX MEDIUM: Robust PG driver handling (node-postgres uses .rows, postgres.js is an array)
+    rows = Array.isArray(result) ? result : (result?.rows || []);
   } else {
-    // sqlite drivers (better-sqlite3, d1, etc.) often return rows directly as an array
+    // sqlite drivers (better-sqlite3, d1, etc.) return rows directly
     rows = Array.isArray(result) ? result : [];
   }
   
@@ -82,14 +82,14 @@ export async function getTempTableCount(tx: any, tableIdent: any): Promise<numbe
  */
 export function getTableConfig(table: any): any {
   if (!table) return null;
-  
-  // Detect by entityKind marker if available
+
+  // Detect by entityKind marker if available  
   const kind = table.constructor?.[Symbol.for('drizzle:EntityKind')];
   if (kind === 'PgTable') return getPgTableConfig(table);
   if (kind === 'MySqlTable') return getMySqlTableConfig(table);
   if (kind === 'SQLiteTable') return getSQLiteTableConfig(table);
-  
-  // Fallback probing: Try each core's getTableConfig
+
+  // Fallback probing: Try each core's getTableConfig  
   try {
     const config = getPgTableConfig(table);
     if (config && config.columns) return config;
@@ -124,14 +124,17 @@ export function getPrimaryKeyPropertyNames(table: any): string[] {
   // 2. Check table-level primary keys (composite or explicitly defined in extraConfig)
   const config = getTableConfig(table);
   if (config && Array.isArray(config.primaryKeys)) {
+    // FIX MEDIUM: Cache Object.entries once outside the nested loops for efficiency
+    const colEntries = Object.entries(cols);
+
     for (const pk of config.primaryKeys) {
       if (Array.isArray(pk.columns)) {
         for (const pkCol of pk.columns) {
           const dbName = pkCol.name;
           if (!dbName) continue;
           
-          // Match by database name to property name
-          for (const [propName, col] of Object.entries(cols)) {
+          // Match by database name to property name using cached entries
+          for (const [propName, col] of colEntries) {
             if ((col as any).name === dbName) {
               pkPropertyNames.add(propName);
               break;
