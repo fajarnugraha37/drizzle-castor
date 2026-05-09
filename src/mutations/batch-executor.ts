@@ -1,6 +1,6 @@
-import { sql, eq, inArray } from "drizzle-orm";
+import { sql, eq, exists } from "drizzle-orm";
 import { generateTempTableName, supportsReturning, getTempTableCount } from "../helper/dialect-helper";
-import { buildSearchQueries, hydrateResults, parseFilter, isFilterSimple, buildExistsCondition } from "../query-parser";
+import { buildSearchQueries, hydrateResults, buildExistsCondition } from "../query-parser";
 import { isMutated } from "../helper";
 import { MutationError } from "../errors";
 import type { ExecutionContext } from "../types/context";
@@ -29,12 +29,19 @@ export async function executeBatchMutation(
   if (supportsReturning(db)) {
     return await db.transaction(async (tx: any) => {
       try {
-        let whereAst;
-        if (isFilterSimple(searchFilter, metadata, baseTableName)) {
-          whereAst = parseFilter(searchFilter, baseTable, new Map(), metadata, baseTableName, tx);
-        } else {
-          whereAst = await buildExistsCondition(searchFilter, { ...translatorContext, db: tx }, baseTable);
-        }
+        // let whereAst;
+        // if (isFilterSimple(searchFilter, metadata, baseTableName)) {
+        //   whereAst = parseFilter(searchFilter, baseTable, new Map(), metadata, baseTableName, tx);
+        // } else {
+        //   whereAst = await buildExistsCondition(searchFilter, { ...translatorContext, db: tx }, baseTable);
+        // }
+        
+        // [DECISION]: Always use EXISTS strategy for batch mutations 
+        // even if it may be less performant for simple cases.
+        // This avoids the risk of limitations with IN (subquery) materialization 
+        // and to improve scalability and avoid potential database engine limits
+        // since it is hard to reliably determine the number of results beforehand
+        const whereAst = await buildExistsCondition(searchFilter, { ...translatorContext, db: tx }, baseTable);
         
         let preHydratedData: any[] = [];
         if (hydrateBefore) {
@@ -85,13 +92,22 @@ export async function executeBatchMutation(
     await tx.execute(sql`CREATE TEMPORARY TABLE ${tempTableIdent} AS SELECT ${pkColumn} FROM ${baseTable} WHERE 1=0`);
 
     try {
-      let whereAst;
-      if (isFilterSimple(searchFilter, metadata, baseTableName)) {
-        whereAst = parseFilter(searchFilter, baseTable, new Map(), metadata, baseTableName, tx);
-      } else {
-        whereAst = await buildExistsCondition(searchFilter, { ...translatorContext, db: tx }, baseTable);
-      }
+      // let whereAst;
+      // if (isFilterSimple(searchFilter, metadata, baseTableName)) {
+      //   whereAst = parseFilter(searchFilter, baseTable, new Map(), metadata, baseTableName, tx);
+      // } else {
+      //   whereAst = await buildExistsCondition(searchFilter, { ...translatorContext, db: tx }, baseTable);
+      // }
+
+      // [DECISION]: Always use EXISTS strategy for batch mutations 
+      // even if it may be less performant for simple cases.
+      // This avoids the risk of limitations with IN (subquery) materialization 
+      // and to improve scalability and avoid potential database engine limits
+      // since it is hard to reliably determine the number of results beforehand
+      const whereAst = await buildExistsCondition(searchFilter, { ...translatorContext, db: tx }, baseTable);
       
+      // FIX: Ensure WHERE clause is only appended if whereAst is not empty.
+      // Prevents syntax error "SELECT ... FROM table WHERE " when filter is empty {}.
       const whereClause = whereAst ? sql` WHERE ${whereAst}` : sql``;
 
       await tx.execute(sql`
@@ -109,13 +125,18 @@ export async function executeBatchMutation(
           { ...translatorContext, db: tx },
           false
         );
+
         const hydrationQuery = mainQuery.innerJoin(tempTableIdent, eq(pkColumn, sql`${tempTableIdent}.${dbColumnIdent}`));
         const rawRows = await hydrationQuery;
         preHydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
       }
 
-      const subquery = sql`(SELECT ${dbColumnIdent} FROM ${tempTableIdent})`;
-      const result = await mutationFn(tx, inArray(pkColumn, subquery as any));
+      const existsCondition = exists(
+        tx.select({ one: sql`1` })
+          .from(tempTableIdent)
+          .where(eq(sql`${tempTableIdent}.${dbColumnIdent}`, pkColumn))
+      );
+      const result = await mutationFn(tx, existsCondition);
 
       if (!isMutated(result)) {
         return [];
@@ -123,7 +144,7 @@ export async function executeBatchMutation(
 
       if (hydrateBefore) return preHydratedData;
 
-      // 4. Hydrate joining Temp Table
+      // 4. Hydrate joining Temp Table to only return affected records
       const { mainQuery, paths } = await buildSearchQueries(
         { 
           filter: rehydrateFilter || {}, 

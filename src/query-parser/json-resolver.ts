@@ -46,11 +46,15 @@ export function buildJsonExtractionSql(
 
   if (dialect === "pg") {
     const pgPath = `{${jsonPath.replace(/\./g, ",")}}`;
-    return sql`${column}#>${pgPath}`;
+    // FIX: Use #>> to extract as text instead of #> (jsonb). 
+    // This allows standard operators like $eq ("value") to work without type mismatch errors.
+    return sql`${column}#>>${pgPath}`;
   } else if (dialect === "mysql") {
     const formattedPath = formatSqliteMysqlPath(jsonPath);
     const myPath = `$.${formattedPath}`;
-    return sql`JSON_EXTRACT(${column}, ${myPath})`;
+    // FIX: Use ->> operator to return unquoted text. 
+    // Prevents "value" (with quotes) failing comparison against value (without quotes).
+    return sql`${column}->>${myPath}`;
   } else {
     const formattedPath = formatSqliteMysqlPath(jsonPath);
     const litePath = `$.${formattedPath}`;
@@ -110,7 +114,9 @@ export function parseUpdateSet(
       const args = mutations.flatMap(mut => {
         const formattedPath = formatSqliteMysqlPath(mut.path);
         const fullPath = `$.${formattedPath}`;
-        return [sql`${fullPath}`, sql`CAST(${JSON.stringify(mut.value)} AS JSON)`];
+        // Restore: Ensure non-scalar values are correctly handled via JSON stringification.
+        const jsonVal = JSON.stringify(mut.value);
+        return [sql`${fullPath}`, sql`CAST(${jsonVal} AS JSON)`];
       });
       mutationSql = sql`JSON_SET(${mutationSql}, ${sql.join(args, sql`, `)})`;
     } else {
@@ -118,7 +124,9 @@ export function parseUpdateSet(
       const args = mutations.flatMap(mut => {
         const formattedPath = formatSqliteMysqlPath(mut.path);
         const fullPath = `$.${formattedPath}`;
-        return [sql`${fullPath}`, sql`json(${JSON.stringify(mut.value)})`];
+        // Restore: Use json() function for SQLite to ensure value is treated as JSON.
+        const jsonVal = JSON.stringify(mut.value);
+        return [sql`${fullPath}`, sql`json(${jsonVal})`];
       });
       mutationSql = sql`json_set(${mutationSql}, ${sql.join(args, sql`, `)})`;
     }

@@ -1,6 +1,6 @@
-import { sql, eq, inArray } from "drizzle-orm";
+import { sql, eq, exists } from "drizzle-orm";
 import { generateTempTableName, supportsReturning, getTempTableCount } from "../helper/dialect-helper";
-import { buildSearchQueries, hydrateResults, parseFilter, isFilterSimple, buildExistsCondition } from "../query-parser";
+import { buildSearchQueries, hydrateResults, buildExistsCondition } from "../query-parser";
 import { isMutated } from "../helper";
 import { MutationError } from "../errors";
 import type { ExecutionContext } from "../types/context";
@@ -32,12 +32,19 @@ export async function executeSingleMutation(
   if (supportsReturning(db)) {
     return await db.transaction(async (tx: any) => {
       try {
-        let whereAst;
-        if (isFilterSimple(effectiveFilter, metadata, baseTableName)) {
-          whereAst = parseFilter(effectiveFilter, baseTable, new Map(), metadata, baseTableName, tx);
-        } else {
-          whereAst = await buildExistsCondition(effectiveFilter, { ...translatorContext, db: tx }, baseTable);
-        }
+        // let whereAst;
+        // if (isFilterSimple(effectiveFilter, metadata, baseTableName)) {
+        //   whereAst = parseFilter(effectiveFilter, baseTable, new Map(), metadata, baseTableName, tx);
+        // } else {
+        //   whereAst = await buildExistsCondition(effectiveFilter, { ...translatorContext, db: tx }, baseTable);
+        // }
+        
+        // [DECISION]: Always use EXISTS strategy for batch mutations 
+        // even if it may be less performant for simple cases.
+        // This avoids the risk of limitations with IN (subquery) materialization 
+        // and to improve scalability and avoid potential database engine limits
+        // since it is hard to reliably determine the number of results beforehand
+        const whereAst = await buildExistsCondition(effectiveFilter, { ...translatorContext, db: tx }, baseTable);
         
         let preHydratedData: any | null = null;
         if (hydrateBefore) {
@@ -57,17 +64,19 @@ export async function executeSingleMutation(
         if (!isMutated(result)) return null;
         if (hydrateBefore) return preHydratedData;
 
+        // CLEAN REHYDRATE: Use rehydrateFilter if provided (contains status checks), otherwise just the ID
         const rehydrateQuery: any = { 
-          filter: { 
-            $and: [{ [pkName]: { $eq: idValue } }, rehydrateFilter].filter(Boolean)
-          }, 
+          filter: rehydrateFilter || { [pkName]: { $eq: idValue } }, 
           page: 1, 
           pageSize: 1 
         };
 
         const { mainQuery, paths } = await buildSearchQueries(
           rehydrateQuery,
-          { ...translatorContext, db: tx },
+          { 
+            ...translatorContext, 
+            db: tx 
+          },
           true
         );
         const rawRows = await mainQuery;
@@ -91,12 +100,18 @@ export async function executeSingleMutation(
     await tx.execute(sql`CREATE TEMPORARY TABLE ${tempTableIdent} AS SELECT ${pkColumn} FROM ${baseTable} WHERE 1=0`);
 
     try {
-      let whereAst;
-      if (isFilterSimple(effectiveFilter, metadata, baseTableName)) {
-        whereAst = parseFilter(effectiveFilter, baseTable, new Map(), metadata, baseTableName, tx);
-      } else {
-        whereAst = await buildExistsCondition(effectiveFilter, { ...translatorContext, db: tx }, baseTable);
-      }
+      // let whereAst;
+      // if (isFilterSimple(effectiveFilter, metadata, baseTableName)) {
+      //   whereAst = parseFilter(effectiveFilter, baseTable, new Map(), metadata, baseTableName, tx);
+      // } else {
+      //   whereAst = await buildExistsCondition(effectiveFilter, { ...translatorContext, db: tx }, baseTable);
+      // }
+      // [DECISION]: Always use EXISTS strategy for batch mutations 
+      // even if it may be less performant for simple cases.
+      // This avoids the risk of limitations with IN (subquery) materialization 
+      // and to improve scalability and avoid potential database engine limits
+      // since it is hard to reliably determine the number of results beforehand
+      const whereAst = await buildExistsCondition(effectiveFilter, { ...translatorContext, db: tx }, baseTable);
 
       const whereClause = whereAst ? sql` WHERE ${whereAst}` : sql``;
 
@@ -110,35 +125,47 @@ export async function executeSingleMutation(
 
       let preHydratedData: any | null = null;
       if (hydrateBefore) {
+        // Use the effective filter (which contains the ID) to find the record before deletion
         const { mainQuery, paths } = await buildSearchQueries(
-          { filter: {}, page: 1, pageSize: 1 } as any,
+          { filter: effectiveFilter, page: 1, pageSize: 1 } as any,
           { ...translatorContext, db: tx },
           true
         );
-        const hydrationQuery = mainQuery.innerJoin(tempTableIdent, eq(pkColumn, sql`${tempTableIdent}.${dbColumnIdent}`));
-        const rawRows = await hydrationQuery;
+        
+        const rawRows = await mainQuery;
         const hydrated = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
         preHydratedData = hydrated.length > 0 ? hydrated[0] : null;
       }
 
-      const subquery = sql`(SELECT ${dbColumnIdent} FROM ${tempTableIdent})`;
-      const result = await mutationFn(tx, inArray(pkColumn, subquery as any));
+      const existsCondition = exists(
+        tx.select({ one: sql`1` })
+          .from(tempTableIdent)
+          .where(eq(sql`${tempTableIdent}.${dbColumnIdent}`, pkColumn))
+      );
+      const result = await mutationFn(tx, existsCondition);
 
       if (!isMutated(result)) return null;
       if (hydrateBefore) return preHydratedData;
 
+      // FIX: Clean up re-hydration query. 
+      // Do not use $and if not needed to prevent redundant "id = ? AND id = ?" in SQL.
+      // Use rehydrateFilter (usually status-based) or default to the ID.
+      const rehydrateQuery: any = { 
+        filter: rehydrateFilter || { [pkName]: { $eq: idValue } }, 
+        page: 1, 
+        pageSize: 1 
+      };
+
       const { mainQuery, paths } = await buildSearchQueries(
-        { 
-          filter: rehydrateFilter || {}, 
-          page: 1, 
-          pageSize: 1 
-        } as any,
+        rehydrateQuery,
         { ...translatorContext, db: tx },
         true
       );
 
-      const hydrationQuery = mainQuery.innerJoin(tempTableIdent, eq(pkColumn, sql`${tempTableIdent}.${dbColumnIdent}`));
-      const rawRows = await hydrationQuery;
+      // FIX: Removed outer .where(eq(joinPkColumn, idValue)) call.
+      // buildSearchQueries already provides a mainQuery joined with the correctly filtered CTE 'sq'.
+      // Adding another WHERE clause results in redundant SQL and potential re-hydration failure in MySQL.
+      const rawRows = await mainQuery;
       
       const results = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
       return results.length > 0 ? results[0] : null;

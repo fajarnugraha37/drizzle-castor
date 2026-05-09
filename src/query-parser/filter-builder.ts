@@ -13,7 +13,8 @@ import { TableNotFoundError } from "../errors";
  * A filter is considered complex if it contains dots (relations or JSON paths).
  */
 export function isFilterSimple(filter: any, metadata: any, baseTableName: string): boolean {
-  if (!filter || typeof filter !== "object") return true;
+  if (!filter || typeof filter !== "object") 
+    return true;
 
   for (const key of Object.keys(filter)) {
     if (key === "$and" || key === "$or" || key === "$not") {

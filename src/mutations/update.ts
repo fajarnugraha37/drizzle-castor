@@ -23,6 +23,9 @@ export async function executeUpdateOne(
     filter: { [pkName]: { $eq: params.id } },
   }, metadata, baseTableName, "active");
 
+  // FIX: Removed the 7th argument (explicit rehydrateFilter).
+  // executeSingleMutation internally builds the re-hydration filter using params.id,
+  // so passing it again here caused redundant "id = ? AND id = ?" clauses in the final SQL.
   return await executeSingleMutation(
     ctx,
     baseTable,

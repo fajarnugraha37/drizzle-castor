@@ -14,11 +14,13 @@ function unflattenAndParseJson(obj: any, tableColumns?: Record<string, any>): an
   for (const [key, value] of Object.entries(obj)) {
     let parsedValue = value;
     
-    // BUG-4 FIX: Only parse JSON if we are sure it's intended to be JSON
+    // BUG-4 FIX: Only parse JSON if we are sure it's intended to be JSON.
+    // Enhanced detection logic for MySQL/MariaDB drivers that might return different type names.
     if (typeof value === "string") {
       const col = tableColumns ? tableColumns[key] : undefined;
-      const isJsonColumn = col && (col as any).dataType === "json";
-      const isJsonExtraction = key.includes("."); // Results of json_extract often have dots
+      const colType = col ? ((col as any).dataType || (col as any).columnType || "").toLowerCase() : "";
+      const isJsonColumn = colType.includes("json"); // Broaden match for "json", "jsonb", "longtext" with json, etc.
+      const isJsonExtraction = key.includes("."); 
       
       if (isJsonColumn || isJsonExtraction) {
         const trimmed = value.trim();
