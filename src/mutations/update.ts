@@ -31,8 +31,9 @@ export async function executeUpdateOne(
       const qb = tx.update(baseTable).set(parsedSetParams).where(whereClause);
       
       if (supportsReturning(tx)) {
-        const r = await qb.returning({ id: pkColumn });
-        return r.map((i: any) => i.id);
+        // Robustly map PK using current pkName
+        const r = await qb.returning({ [pkName]: pkColumn });
+        return r.map((i: any) => i[pkName]);
       } else {
         const res: any = await qb;
         return res[0]?.affectedRows ?? res.affectedRows ?? 0;
@@ -68,8 +69,8 @@ export async function executeUpdateMany(
       const qb = tx.update(baseTable).set(parsedSetParams).where(whereClause);
       
       if (supportsReturning(tx)) {
-        const r = await qb.returning({ id: pkColumn });
-        return r.map((i: any) => i.id);
+        const r = await qb.returning({ [pkName]: pkColumn });
+        return r.map((i: any) => i[pkName]);
       } else {
         const res: any = await qb;
         return res[0]?.affectedRows ?? res.affectedRows ?? 0;

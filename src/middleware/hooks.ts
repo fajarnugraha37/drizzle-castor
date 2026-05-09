@@ -1,13 +1,19 @@
+import { findBaseTable, getPrimaryKeyColumnName } from "../helper";
 import type { Middleware } from "./index";
 
 export function createHooksMiddleware(): Middleware {
   return async (ctx, next) => {
     const { action, tableName, translatorContext, params } = ctx;
-    const hooks = (translatorContext.metadata as any)[tableName]?.hooks;
+    const { tables, metadata } = translatorContext;
+    const hooks = (metadata as any)[tableName]?.hooks;
 
     if (!hooks) {
       return next();
     }
+
+    // Resolve PK name for filter construction
+    const baseTable = findBaseTable(tables, tableName);
+    const pkName = getPrimaryKeyColumnName(baseTable);
 
     // --- BEFORE HOOKS ---
     switch (action) {
@@ -28,16 +34,16 @@ export function createHooksMiddleware(): Middleware {
         if (hooks.beforeSearch) await hooks.beforeSearch(params.query);
         break;
       case "update":
-        if (hooks.beforeUpdate) await hooks.beforeUpdate(params.set, params.id ? { id: { $eq: params.id } } : params.filter);
+        if (hooks.beforeUpdate) await hooks.beforeUpdate(params.set, params.id ? { [pkName]: { $eq: params.id } } : params.filter);
         break;
       case "softDelete":
-        if (hooks.beforeSoftDelete) await hooks.beforeSoftDelete(params.id ? { id: { $eq: params.id } } : params.filter);
+        if (hooks.beforeSoftDelete) await hooks.beforeSoftDelete(params.id ? { [pkName]: { $eq: params.id } } : params.filter);
         break;
       case "restore":
-        if (hooks.beforeRestore) await hooks.beforeRestore(params.id ? { id: { $eq: params.id } } : params.filter);
+        if (hooks.beforeRestore) await hooks.beforeRestore(params.id ? { [pkName]: { $eq: params.id } } : params.filter);
         break;
       case "hardDelete":
-        if (hooks.beforeHardDelete) await hooks.beforeHardDelete(params.id ? { id: { $eq: params.id } } : params.filter);
+        if (hooks.beforeHardDelete) await hooks.beforeHardDelete(params.id ? { [pkName]: { $eq: params.id } } : params.filter);
         break;
     }
 

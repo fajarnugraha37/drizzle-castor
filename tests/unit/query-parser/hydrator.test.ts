@@ -1,37 +1,40 @@
 import { expect, test, describe } from "bun:test";
 import { hydrateResults } from "../../../src/query-parser/hydrator";
-
-const COLUMNS = Symbol.for("drizzle:Columns");
+import { pgTable, serial, text, json } from "drizzle-orm/pg-core";
 
 describe("Query Parser: Hydrator", () => {
+  // Use real Drizzle tables for reliable metadata
+  const usersTable = pgTable("users", {
+    id: serial("id").primaryKey(),
+    name: text("name"),
+    meta: json("meta"),
+  });
+
+  const postsTable = pgTable("posts", {
+    id: serial("id").primaryKey(),
+    title: text("title"),
+    userId: serial("user_id"),
+  });
+
+  const profilesTable = pgTable("profiles", {
+    id: serial("id").primaryKey(),
+    age: serial("age"),
+    userId: serial("user_id"),
+  });
+
   const mockMetadata = {
     users: {
-      table: {
-        [COLUMNS]: {
-          id: { dataType: "number" },
-          name: { dataType: "string" },
-          meta: { dataType: "json" },
-        },
-      },
+      table: usersTable,
       oneToMany: [{ relationName: "posts", relatedTable: "posts" }],
       oneToOne: [{ relationName: "profile", relatedTable: "profiles" }],
     },
     posts: {
-      table: {
-        [COLUMNS]: {
-          id: { dataType: "number" },
-          title: { dataType: "string" },
-        },
-      },
+      table: postsTable,
     },
     profiles: {
-      table: {
-        [COLUMNS]: {
-          age: { dataType: "number" },
-        },
-      },
+      table: profilesTable,
     },
-  };
+  } as any;
 
   test("Hydrates basic rows without relations", () => {
     const rows = [
@@ -55,7 +58,7 @@ describe("Query Parser: Hydrator", () => {
 
   test("Hydrates oneToOne relations", () => {
     const rows = [
-      { users: { id: 1 }, rel_profile: { age: 30 } }
+      { users: { id: 1 }, rel_profile: { id: 100, age: 30 } }
     ];
     const res = hydrateResults(rows, "users", mockMetadata, "id", ["profile"]);
     expect(res.length).toBe(1);

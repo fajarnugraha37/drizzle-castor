@@ -38,11 +38,11 @@ export async function executeSoftDeleteOne(
       const qb = tx.update(baseTable).set(parsedSetParams).where(whereClause);
       
       if (supportsReturning(tx)) {
-        const r = await qb.returning({ id: pkColumn });
-        return r.map((i: any) => i.id);
+        const r = await qb.returning({ [pkName]: pkColumn });
+        return r.map((i: any) => i[pkName]);
       } else {
         const res: any = await qb;
-        return res.rowsAffected ?? 0;
+        return res[0]?.affectedRows ?? res.affectedRows ?? 0;
       }
     },
     params.id,
@@ -81,11 +81,11 @@ export async function executeSoftDeleteMany(
     async (tx, whereClause) => {
       const qb = tx.update(baseTable).set(parsedSetParams).where(whereClause);
       if (supportsReturning(tx)) {
-        const r = await qb.returning({ id: pkColumn });
-        return r.map((i: any) => i.id);
+        const r = await qb.returning({ [pkName]: pkColumn });
+        return r.map((i: any) => i[pkName]);
       } else {
         const res: any = await qb;
-        return res.rowsAffected ?? 0;
+        return res[0]?.affectedRows ?? res.affectedRows ?? 0;
       }
     },
     searchFilter.filter,

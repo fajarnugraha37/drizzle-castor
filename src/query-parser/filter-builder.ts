@@ -1,6 +1,6 @@
 import { sql, getTableName, exists, aliasedTable, and, eq } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
-import { analyzeQuery, extractFilterPaths } from "./analyzer";
+import { analyzeQuery } from "./analyzer";
 import { buildAliases } from "./alias-manager";
 import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compiler";
 import { getPrimaryKeyColumnName, resolveProviderValues } from "../helper";
@@ -16,12 +16,27 @@ export type TranslatorContext = {
 
 /**
  * Checks if a filter only touches the base table (no relations).
+ * A filter is considered complex if it contains dots (relations or JSON paths).
  */
 export function isFilterSimple(filter: any, metadata: any, baseTableName: string): boolean {
-  if (!filter) return true;
-  const paths = new Set<string>();
-  extractFilterPaths(filter, paths, metadata, baseTableName);
-  return paths.size === 0;
+  if (!filter || typeof filter !== "object") return true;
+
+  for (const key of Object.keys(filter)) {
+    if (key === "$and" || key === "$or" || key === "$not") {
+      const children = Array.isArray(filter[key]) ? filter[key] : [filter[key]];
+      if (children.some((c: any) => !isFilterSimple(c, metadata, baseTableName))) {
+        return false;
+      }
+    } else if (!key.startsWith("$")) {
+      // FIX MEDIUM: If key contains a dot, it touches a relation or JSON column,
+      // making it complex and requiring EXISTS/JOIN strategy.
+      if (key.includes(".")) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 /**
