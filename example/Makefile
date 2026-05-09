@@ -1,14 +1,14 @@
 start:
-	bun run index.ts
+	bun run index.ts  ${args}
 
-db:generate:
+db-generate:
 	bunx drizzle-kit generate
 
-db:migrate:
+db-migrate:
 	bunx drizzle-kit migrate
 
-db:push:
+db-push:
 	bunx drizzle-kit push
 
-db:pull:
+db-pull:
 	bunx drizzle-kit pull

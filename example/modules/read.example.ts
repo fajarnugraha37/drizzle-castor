@@ -2,7 +2,7 @@ import "bun";
 import { db, isHasUsersData, listOfProfiles, schemaMetadata } from "./helper";
 
 export async function readExample(args?: string[]) {
-  const userRepo = schemaMetadata.repoFactory("users", {});
+  const userRepo = schemaMetadata.repoFactory("users");
   const users = (await isHasUsersData(50)).data;
 
   for (const profile of listOfProfiles) {

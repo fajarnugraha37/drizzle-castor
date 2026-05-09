@@ -171,12 +171,7 @@ async function playground() {
   console.log("JSON Array Extraction Result:", JSON.stringify(jsonArrayResult, null, 2));
 
   console.log("\n--- Testing RBAC Trimming ---");
-  const trimmedRepo = builder.repoFactory("users", {
-    public: {
-      allowedFilters: ["name", "email"],
-      allowedProjections: ["name"],
-    }
-  });
+  const trimmedRepo = builder.repoFactory("users", {});
 
   const trimmedQuery = await trimmedRepo.searchMany({
     projection: ["name", "persona"],

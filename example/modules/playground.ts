@@ -2,26 +2,7 @@ import "bun";
 import { schemaMetadata } from "./helper";
 
 export async function playground() {
-  const userRepo = schemaMetadata.repoFactory("users", {
-    default: {
-      allowedProjections: [
-        "id",
-        "name",
-        "email",
-        "age",
-        "zipCode",
-        "stringId",
-        "persona",
-        "occupational",
-        "settings",
-      ],
-    },
-    admin: {
-      allowedProjections: ["*"],
-      allowedFilters: ["*"],
-      allowedUpdates: ["*"],
-    },
-  });
+  const userRepo = schemaMetadata.repoFactory("users");
 
   const users = await userRepo.searchOne({
     order: {
@@ -97,13 +78,7 @@ export async function playground() {
     );
   }
 
-  const groupRepo = schemaMetadata.repoFactory("groups", {
-    admin: {
-      allowedProjections: ["*"],
-      allowedFilters: ["*"],
-      allowedUpdates: ["*"],
-    },
-  });
+  const groupRepo = schemaMetadata.repoFactory("groups");
 
   try {
     const res2 = await groupRepo.updateMany(

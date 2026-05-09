@@ -3,7 +3,7 @@ import { faker } from "@faker-js/faker";
 import { db, listOfProfiles, schemaMetadata } from "./helper";
 
 export async function createExample(args?: string[]) {
-  const userRepo = schemaMetadata.repoFactory("users", {});
+  const userRepo = schemaMetadata.repoFactory("users");
 
   // check create one with multiple profiles
   const ids = [];

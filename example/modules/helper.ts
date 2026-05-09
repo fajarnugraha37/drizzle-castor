@@ -26,7 +26,7 @@ export function getDatabaseFileLocation(): string {
 export const listOfProfiles = ["default", "public", ["public", "admin"], "admin"] as const;
 
 export async function isHasUsersData(pageSize = 50) {
-  const userRepo = schemaMetadata.repoFactory("users", {});
+  const userRepo = schemaMetadata.repoFactory("users");
   const users = await userRepo.searchPage(
     {
       pageSize,
@@ -68,6 +68,46 @@ export const schemaMetadataBuilder = createSchemaBuilder(db, [
   groupsTable,
   userGroups,
 ] as const)
+  .profiles(['default', 'public', 'admin', 'guest'] as const)
+  .policies('users', {
+    default: { 
+      allowedActions: ["read"],
+      allowedProjections: [
+        "id",
+        "name",
+        "email",
+        "age",
+        "zipCode",
+        "stringId",
+        "persona",
+        "occupational",
+        "settings",
+      ],
+      allowedFilters: "*",
+      allowedSorts: "*",
+    },
+    public: { 
+      allowedActions: "*",
+      allowedFilters: ["name", "email"],
+      allowedProjections: ["name"]
+    },
+    admin: {
+      allowedActions: ["create", "read", "update", "softDelete", "restore", "hardDelete"],
+      allowedSets: "*",
+      allowedProjections: "*",
+      allowedFilters: "*",
+      allowedSorts: "*"
+    },
+    'guest': async (ctx) => {
+      return {
+        allowedActions: ["create", "read", "update", "softDelete", "restore", "hardDelete"],
+        allowedSets: "*",
+        allowedProjections: "*",
+        allowedFilters: "*",
+        allowedSorts: "*"
+      };
+    },
+  })
   .use(async (ctx, next) => {
     // Determine user-friendly action name for logging
     const actionName = ctx.action.replace(/([A-Z])/g, ' $1').toLowerCase();
@@ -112,74 +152,6 @@ export const schemaMetadataBuilder = createSchemaBuilder(db, [
         joinRelatedKey: "users_to_groups.groupId",
       },
     ],
-    profiles: {
-      default: ["read"],
-      public: ["read"],
-      admin: [
-        "create",
-        "read",
-        "update",
-        "softDelete",
-        "restore",
-        "hardDelete",
-      ],
-    },
-    hooks: {
-      beforeSearch: async (query): Promise<void> => {
-        console.log(`[Hooks] Before search hook triggered`);
-        // console.log(`[Hooks] Before search hook triggered for users with query:`, query);
-      },
-      afterSearch: async (query, result): Promise<void> => {
-        console.log(`[Hooks] After search hook triggered`);
-        // console.log(`[Hooks] After search hook triggered for users with query:`, query);
-        // console.log(`[Hooks] Search result:`, result[0]?.name);
-      },
-      beforeCreate: async (data): Promise<void> => {
-        console.log(`[Hooks] Before create hook triggered`);
-        // console.log(`[Hooks] Before create hook triggered for users with data:`, data);
-      },
-      afterCreate: async (data): Promise<void> => {
-        console.log(`[Hooks] After create hook triggered`);
-        // console.log(`[Hooks] After create hook triggered for users with data:`, data);
-        // console.log(`[Hooks] Created user:`, result.name);
-      },
-      beforeUpdate: async (filter, data): Promise<void> => {
-        console.log(`[Hooks] Before update hook triggered`);
-        // console.log(`[Hooks] Before update hook triggered for users with filter:`, filter, `and data:`, data);
-      },
-      afterUpdate: async (data, result): Promise<void> => {
-        console.log(`[Hooks] After update hook triggered`);
-        // console.log(`[Hooks] After update hook triggered for users with filter:`, filter, `and data:`, data);
-        // console.log(`[Hooks] Updated user:`, result[0]?.name);
-      },
-      beforeSoftDelete: async (filter): Promise<void> => {
-        console.log(`[Hooks] Before soft delete hook triggered`);
-        // console.log(`[Hooks] Before soft delete hook triggered for users with filter:`, filter);
-      },
-      afterSoftDelete: async (filter): Promise<void> => {
-        console.log(`[Hooks] After soft delete hook triggered`);
-        // console.log(`[Hooks] After soft delete hook triggered for users with filter:`, filter);
-        // console.log(`[Hooks] Soft deleted user:`, result[0]?.name);
-      },
-      beforeRestore: async (filter): Promise<void> => {
-        console.log(`[Hooks] Before restore hook triggered`);
-        // console.log(`[Hooks] Before restore hook triggered for users with filter:`, filter);
-      },
-      afterRestore: async (result): Promise<void> => {
-        console.log(`[Hooks] After restore hook triggered`);
-        // console.log(`[Hooks] After restore hook triggered for users with filter:`, filter);
-        // console.log(`[Hooks] Restored user:`, result[0]?.name);
-      },
-      beforeHardDelete: async (filter): Promise<void> => {
-        console.log(`[Hooks] Before hard delete hook triggered`);
-        // console.log(`[Hooks] Before hard delete hook triggered for users with filter:`, filter);
-      },
-      afterHardDelete: async (result): Promise<void> => {
-        console.log(`[Hooks] After hard delete hook triggered`);
-        // console.log(`[Hooks] After hard delete hook triggered for users with filter:`, filter);
-        // console.log(`[Hooks] Hard deleted user:`, result[0]?.name);
-      },
-    },
     softDelete: {
       deleteValue: {
         deletedFlag: 1,
