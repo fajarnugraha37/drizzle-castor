@@ -71,7 +71,7 @@ export function hydrateResults(
   rows: any[],
   baseTableName: string,
   metadata: any,
-  primaryKeyField: string = "id",
+  primaryKeyField: string,
   paths: string[] = []
 ): any[] {
   const rootMap = new Map<any, any>();
