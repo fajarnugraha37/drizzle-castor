@@ -70,8 +70,8 @@ describe("Query Parser: AST Compiler", () => {
     const mockAliasMap = new Map<string, any>();
     mockAliasMap.set("profile", mockProfilesTable);
 
-    test("Returns undefined if projection is empty", () => {
-      expect(buildSelection([], "users", mockBaseTable, mockAliasMap, mockMetadata, mockDb)).toBeUndefined();
+    test("Returns undefined if projection is empty and throws for empty array", () => {
+      expect(() => buildSelection([], "users", mockBaseTable, mockAliasMap, mockMetadata, mockDb)).toThrow();
       expect(buildSelection(undefined, "users", mockBaseTable, mockAliasMap, mockMetadata, mockDb)).toBeUndefined();
     });
 
