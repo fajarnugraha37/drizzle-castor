@@ -18,7 +18,9 @@ describe("PostgreSQL Integration - Delete & Restore Operations", () => {
     pool = new pg.Pool({
       connectionString: container.getConnectionUri(),
     });
-    db = drizzle(pool);
+    db = drizzle(pool, {
+      logger: true,
+    });
 
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS users (

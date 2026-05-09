@@ -11,7 +11,9 @@ describe("SQLite Integration - Read Operations", () => {
 
   beforeAll(async () => {
     const sqlite = new Database(":memory:");
-    db = drizzle(sqlite);
+    db = drizzle(sqlite, {
+      logger: true,
+    });
 
     db.run(sql`
       CREATE TABLE users (

@@ -16,7 +16,9 @@ describe("MySQL Integration - Read Operations", () => {
   before(async () => {
     container = await new MySqlContainer("mysql:8.0").start();
     connection = await mysql.createConnection(container.getConnectionUri());
-    db = drizzle(connection);
+    db = drizzle(connection, {
+      logger: true,
+    });
 
     await db.execute(sql`
       CREATE TABLE users (

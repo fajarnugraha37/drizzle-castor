@@ -18,7 +18,9 @@ describe("PostgreSQL Integration - Create Operations", () => {
     pool = new pg.Pool({
       connectionString: container!.getConnectionUri(),
     });
-    db = drizzle(pool);
+    db = drizzle(pool, {
+      logger: true,
+    });
 
     // Create tables
     await db.execute(sql`
