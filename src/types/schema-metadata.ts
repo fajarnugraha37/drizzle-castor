@@ -81,6 +81,14 @@ export type TSchemaContext<
   metadata: TMetadata;
 };
 
+export type TTranslatorContext<
+  TDb extends AnyDatabase,
+  TTables extends readonly AnyTable[],
+  TMetadata extends TSchemaMetadata<TDb, TTables> = TSchemaMetadata<TDb, TTables>,
+> = TSchemaContext<TDb, TTables, TMetadata> & {
+  baseTableName: TTableNames<TDb, TTables, TMetadata>;
+};
+
 export type TStrictSchemaMetadata<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],

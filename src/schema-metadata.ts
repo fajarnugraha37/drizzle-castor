@@ -5,9 +5,10 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
 import { findBaseTable } from "./helper";
-import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator } from "./types";
 import { composeMiddleware, createFieldRbacMiddleware, createHooksMiddleware, createRbacMiddleware } from "./middleware/exports";
 import type { Middleware, MiddlewareContext } from "./middleware/index";
+import { runInContext, endExecutionContext } from "./context/manager";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
@@ -17,7 +18,8 @@ export function defineSchemaMetadata<
   tables: TTables, 
   mode: "strict" | "lenient" = "lenient",
   globalMiddlewares: Middleware[] = [],
-  isThrowError: boolean = false
+  isThrowError: boolean = false,
+  traceIdGenerator?: TraceIdGenerator
 ) {
   if (mode === "lenient") {
     console.warn(
@@ -66,18 +68,40 @@ export function defineSchemaMetadata<
       const baseTable = findBaseTable(tables, tableName);
 
       const executeWithMiddleware = (action: DbAction, profile: any, params: any, coreFn: any) => {
-        const ctx: MiddlewareContext = {
-          action,
-          tableName,
-          profile,
-          params,
-          translatorContext,
-          state: {}
-        };
-        
-        return pipeline(ctx, async () => {
-          return coreFn(ctx);
-        });
+        return runInContext(
+          {
+            action,
+            tableName,
+            profile,
+            params,
+            metadata: {}, // Initial empty metadata
+            db,
+            schemaMetadata: metadata,
+            translatorContext,
+          },
+          async () => {
+            const ctx: MiddlewareContext = {
+              action,
+              tableName,
+              profile,
+              params,
+              translatorContext,
+              state: {},
+            };
+
+            try {
+              const result = await pipeline(ctx, async () => {
+                return coreFn(ctx);
+              });
+              endExecutionContext("success");
+              return result;
+            } catch (err) {
+              endExecutionContext("failed", err);
+              throw err;
+            }
+          },
+          traceIdGenerator
+        );
       };
 
       return {

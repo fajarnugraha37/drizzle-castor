@@ -1,5 +1,5 @@
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata } from "./types";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator } from "./types";
 import type { Middleware } from "./middleware/index";
 
 export class SchemaBuilder<
@@ -9,6 +9,7 @@ export class SchemaBuilder<
 > {
   private globalMiddlewares: Middleware[] = [];
   private isThrowError: boolean = false;
+  private traceIdGenerator?: TraceIdGenerator;
 
   constructor(
     private db: TDb,
@@ -24,6 +25,11 @@ export class SchemaBuilder<
 
   withThrowError(val: boolean): this {
     this.isThrowError = val;
+    return this;
+  }
+
+  withTraceIdGenerator(gen: TraceIdGenerator): this {
+    this.traceIdGenerator = gen;
     return this;
   }
 
@@ -43,12 +49,20 @@ export class SchemaBuilder<
     );
     newBuilder.globalMiddlewares = [...this.globalMiddlewares];
     newBuilder.isThrowError = this.isThrowError;
+    newBuilder.traceIdGenerator = this.traceIdGenerator;
     return newBuilder;
   }
 
   build() {
     const finalMetadata = this.metadata as unknown as TMetadata;
-    return defineSchemaMetadata(this.db, this.tables, this.mode, this.globalMiddlewares, this.isThrowError)(finalMetadata);
+    return defineSchemaMetadata(
+      this.db,
+      this.tables,
+      this.mode,
+      this.globalMiddlewares,
+      this.isThrowError,
+      this.traceIdGenerator
+    )(finalMetadata);
   }
 }
 

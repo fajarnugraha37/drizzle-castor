@@ -1,6 +1,17 @@
-import type { DbAction, SearchQuery, FilterQuery, UpdateSet } from "../types";
+import type {
+  DbAction,
+  SearchQuery,
+  FilterQuery,
+  UpdateSet,
+  AnyDatabase,
+  AnyTable,
+  TTranslatorContext,
+} from "../types";
 
-export type MiddlewareContext<T = any> = {
+export type MiddlewareContext<
+  TDb extends AnyDatabase = any,
+  TTables extends readonly AnyTable[] = any,
+> = {
   /** The action being performed (e.g., 'search', 'create', 'update', 'softDelete') */
   action: DbAction;
   /** The name of the table this action is targeting */
@@ -16,25 +27,25 @@ export type MiddlewareContext<T = any> = {
     set?: UpdateSet<any>;
   };
   /** Internal metadata and Drizzle instances */
-  translatorContext: any;
+  translatorContext: TTranslatorContext<TDb, TTables>;
   /** Custom state bag for middleware to pass data down the chain */
   state: Record<string, any>;
 };
 
 export type MiddlewareNext<T = any> = () => Promise<T>;
 
-export type Middleware<T = any> = (
-  ctx: MiddlewareContext<T>,
+export type Middleware<T = any, TDb extends AnyDatabase = any, TTables extends readonly AnyTable[] = any> = (
+  ctx: MiddlewareContext<TDb, TTables>,
   next: MiddlewareNext<T>,
 ) => Promise<T>;
 
 /**
  * Helper to compose an array of middleware into a single executable function
  */
-export function composeMiddleware<T = any>(
-  middleware: Middleware<T>[],
-): (ctx: MiddlewareContext<T>, next: MiddlewareNext<T>) => Promise<T> {
-  return function (context: MiddlewareContext<T>, next: MiddlewareNext<T>) {
+export function composeMiddleware<T = any, TDb extends AnyDatabase = any, TTables extends readonly AnyTable[] = any>(
+  middleware: Middleware<T, TDb, TTables>[],
+): (ctx: MiddlewareContext<TDb, TTables>, next: MiddlewareNext<T>) => Promise<T> {
+  return function (context: MiddlewareContext<TDb, TTables>, next: MiddlewareNext<T>) {
     let index = -1;
     return dispatch(0);
     function dispatch(i: number): Promise<T> {

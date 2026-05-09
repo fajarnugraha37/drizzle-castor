@@ -28,3 +28,8 @@ export type DbDeleteQuery<
   TSchema extends BaseSchema,
   TTableName extends keyof TSchema["metadata"] & string,
 > = DeleteQuery<InferEntity<TSchema, TTableName>>;
+
+/**
+ * Type for trace ID generator, supporting both sync and async.
+ */
+export type TraceIdGenerator = () => string | Promise<string>;
