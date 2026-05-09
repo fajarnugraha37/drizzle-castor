@@ -1,9 +1,10 @@
-import { expect, test, describe } from "bun:test";
+import { expect, test, describe, mock } from "bun:test";
 import {
   getDialect,
   supportsReturning,
   generateTempTableName,
   getPrimaryKeyPropertyNames,
+  getTempTableCount,
 } from "../../../src/helper/dialect-helper";
 import { pgTable, serial, primaryKey } from "drizzle-orm/pg-core";
 
@@ -87,6 +88,53 @@ describe("dialect-helper", () => {
     });
   });
 
+  describe("getTempTableCount", () => {
+    test("should handle MySQL (mysql2) result format [rows, fields]", async () => {
+      const tx = {
+        dialect: { escapeName: (n: string) => `\`${n}\`` },
+        execute: mock(async () => [[{ count: 5 }], []])
+      };
+      const count = await getTempTableCount(tx, "tmp");
+      expect(count).toBe(5);
+    });
+
+    test("should handle Postgres (node-postgres) result format {rows: []}", async () => {
+      const tx = {
+        dialect: { escapeParam: (i: number) => `$${i + 1}` },
+        execute: mock(async () => ({ rows: [{ count: 10 }] }))
+      };
+      const count = await getTempTableCount(tx, "tmp");
+      expect(count).toBe(10);
+    });
+
+    test("should handle Postgres (postgres.js) result format (array directly)", async () => {
+      const tx = {
+        dialect: { escapeParam: (i: number) => `$${i + 1}` },
+        execute: mock(async () => [{ count: 15 }])
+      };
+      const count = await getTempTableCount(tx, "tmp");
+      expect(count).toBe(15);
+    });
+
+    test("should handle SQLite result format (array directly)", async () => {
+      const tx = {
+        dialect: { escapeParam: () => "?" },
+        execute: mock(async () => [{ count: 20 }])
+      };
+      const count = await getTempTableCount(tx, "tmp");
+      expect(count).toBe(20);
+    });
+
+    test("should return 0 for empty results", async () => {
+      const tx = {
+        dialect: { escapeParam: () => "?" },
+        execute: mock(async () => [])
+      };
+      const count = await getTempTableCount(tx, "tmp");
+      expect(count).toBe(0);
+    });
+  });
+
   describe("getPrimaryKeyPropertyNames", () => {
     test("should find column-level primary keys", () => {
       const testTable = pgTable("test_col_pk", {
@@ -119,14 +167,24 @@ describe("dialect-helper", () => {
       const pks = getPrimaryKeyPropertyNames(testTable);
       expect(pks.sort()).toEqual(["tenantId", "userId"].sort());
     });
+  });
 
-    test("should return empty if no primary key found", () => {
-      const testTable = pgTable("test_no_pk", {
-        name: serial("name"),
-      });
+  test("should return empty if no primary key found", () => {
+    const testTable = pgTable("test_no_pk", {
+      name: serial("name"),
+    });
 
-      const pks = getPrimaryKeyPropertyNames(testTable);
-      expect(pks).toEqual([]);
+    const pks = getPrimaryKeyPropertyNames(testTable);
+    expect(pks).toEqual([]);
+  });
+
+  describe("generateTempTableName", () => {
+    test("should return a unique valid temporary table name", () => {
+      const name1 = generateTempTableName();
+      const name2 = generateTempTableName();
+      expect(name1.startsWith("_tmp_castor_")).toBe(true);
+      expect(name1).not.toBe(name2);
+      expect(name1).not.toContain(".");
     });
   });
 
