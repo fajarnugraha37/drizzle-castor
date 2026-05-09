@@ -3,10 +3,24 @@ import { AccessDeniedError, SecurityError } from "./security";
 import { QueryParsingError } from "./query";
 
 /**
- * Checks if an error is an instance of CastorError
+ * Checks if an error is an instance of CastorError.
+ * Uses a robust check that handles both instanceof and cross-environment markers.
  */
 export function isCastorError(error: any): error is CastorError {
-  return error instanceof CastorError || Boolean(error && typeof error === "object" && typeof error.code === "string" && error.name?.endsWith("Error"));
+  if (!error || typeof error !== "object") return false;
+  
+  return (
+    error instanceof CastorError || 
+    error.__isCastorError === true ||
+    (typeof error.code === "string" && 
+     typeof error.message === "string" && 
+     error.name?.endsWith("Error") &&
+     [
+       "SECURITY_ERROR", "ACCESS_DENIED", "QUERY_PARSING_ERROR", 
+       "TABLE_NOT_FOUND", "COLUMN_NOT_FOUND", "RELATION_NOT_FOUND", 
+       "ALIAS_NOT_FOUND", "CONFIGURATION_ERROR", "MUTATION_ERROR"
+     ].includes(error.code))
+  );
 }
 
 /**
@@ -30,11 +44,15 @@ export function isQueryError(error: any): error is QueryParsingError {
 }
 
 /**
- * Safely extracts the error message from an unknown error object
+ * Safely extracts the error message from an unknown error object.
+ * Preserves detail from non-Error objects that contain a message property.
  */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
+  }
+  if (typeof error === "object" && error !== null && "message" in error && typeof (error as any).message === "string") {
+    return (error as any).message;
   }
   if (typeof error === "string") {
     return error;

@@ -1,11 +1,17 @@
-import type { ErrorCode } from "./codes";
+import type { CastorErrorCode } from "./codes";
 
 export class CastorError extends Error {
-  public readonly code: ErrorCode;
+  public readonly code: CastorErrorCode;
   public readonly details?: any;
+  /** Internal marker to safely identify CastorError across different versions/environments */
+  public readonly __isCastorError = true;
 
-  constructor(message: string, code: ErrorCode, details?: any) {
+  constructor(message: string, code: CastorErrorCode, details?: any) {
     super(message);
+    
+    // Explicitly set the prototype for correct instanceof behavior in ES5 environments
+    Object.setPrototypeOf(this, new.target.prototype);
+    
     this.name = this.constructor.name;
     this.code = code;
     this.details = details;

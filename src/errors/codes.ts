@@ -1,4 +1,4 @@
-export type ErrorCode =
+export type CastorErrorCode =
   | "SECURITY_ERROR"
   | "ACCESS_DENIED"
   | "QUERY_PARSING_ERROR"

@@ -19,7 +19,7 @@ describe("Error Utilities", () => {
     });
 
     test("Identifies bundled objects mimicking CastorError (duck typing)", () => {
-      const fakeErr = { name: "SomeError", code: "ANY_CODE", message: "msg" };
+      const fakeErr = { name: "SomeError", code: "ANY_CODE", message: "msg", __isCastorError: true };
       expect(isCastorError(fakeErr)).toBe(true);
     });
 

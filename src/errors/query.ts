@@ -1,32 +1,35 @@
 import { CastorError } from "./base";
-import type { ErrorCode } from "./codes";
+import type { CastorErrorCode } from "./codes";
 
 export class QueryParsingError extends CastorError {
-  constructor(message: string, code: ErrorCode = "QUERY_PARSING_ERROR", details?: any) {
+  constructor(message: string, code: CastorErrorCode = "QUERY_PARSING_ERROR", details?: any) {
     super(message, code, details);
   }
 }
 
 export class TableNotFoundError extends QueryParsingError {
-  constructor(message: string, details?: any) {
-    super(message, "TABLE_NOT_FOUND", details);
+  constructor(tableName: string) {
+    super(`Table '${tableName}' not found`, "TABLE_NOT_FOUND");
   }
 }
 
 export class ColumnNotFoundError extends QueryParsingError {
-  constructor(message: string, details?: any) {
-    super(message, "COLUMN_NOT_FOUND", details);
+  constructor(message: string) {
+    super(message, "COLUMN_NOT_FOUND");
   }
 }
 
 export class RelationNotFoundError extends QueryParsingError {
-  constructor(message: string, details?: any) {
-    super(message, "RELATION_NOT_FOUND", details);
+  constructor(relationName: string, tableName: string) {
+    super(
+      `Relation '${relationName}' not found on table '${tableName}'`,
+      "RELATION_NOT_FOUND",
+    );
   }
 }
 
 export class AliasNotFoundError extends QueryParsingError {
-  constructor(message: string, details?: any) {
-    super(message, "ALIAS_NOT_FOUND", details);
+  constructor(message: string) {
+    super(message, "ALIAS_NOT_FOUND");
   }
 }
