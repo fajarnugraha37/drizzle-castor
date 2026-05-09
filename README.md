@@ -6,7 +6,8 @@
   </a>
 </h1>
 <p align="center">
-    <em><b>drizzle-castor</b> is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over [Drizzle ORM](https://orm.drizzle.team/). It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
+    <em><b>drizzle-castor</b> is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over
+      <b><a href="https://orm.drizzle.team/" target="_blank">Drizzle ORM</a></b>. It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
     </em>
 </p>
 
@@ -28,7 +29,8 @@
 - **Unified Middleware Pipeline**: Adopts the **Koa-style Onion Model** for absolute control flow (`await next()`) on every request.
 - **Unified RBAC Policies**: Secure operations at the action and field levels with support for both **Declarative** (Object Map) and **Imperative** (Sync/Async Callbacks) definitions.
 - **Telemetry**: Event-driven logging system using **`mitt`**. Emits structured events for execution performance, security audit trails, and data mutations.
-- **Dialect Agnostic**: Seamlessly supports PostgreSQL, MySQL, and SQLite. Handles complex dialect-specific logic under the hood (e.g., `RETURNING` clauses vs. Temporary Tables).
+- **Dialect Agnostic**: Supports PostgreSQL, MySQL, and SQLite. Handles complex dialect-specific logic under the hood (e.g., `RETURNING` clauses vs. Temporary Tables for atomic mutations).
+- **Unified RBAC**: Built-in, middleware-driven Role-Based Access Control. Secure operations at the action and field levels (Data Trimming).
 - **Native Soft Deletes**: Declarative soft-delete capabilities that implicitly apply safety filters to queries and joins.
 - **Safe Pagination (Split Queries)**: Leverages Common Table Expressions (CTEs) to prevent Cartesian fan-out when paginating one-to-many or many-to-many relationships.
 
