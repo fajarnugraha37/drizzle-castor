@@ -1,22 +1,7 @@
 import { executionContextStorage } from "./execution-context";
-import type { AnyDatabase, AnyTable, ExecutionContext, TelemetrySubscriber } from "../types";
+import type { AnyDatabase, AnyTable, ExecutionContext } from "../types";
 import { assertSafeKey } from "../helper/assert-helper";
 import { defaultTraceIdGenerator } from "../helper/context-helper";
-
-
-// Global registry for telemetry subscribers
-const telemetrySubscribers: Set<TelemetrySubscriber> = new Set();
-
-/**
- * Registers a telemetry subscriber to listen for completed execution contexts.
- * Returns an unsubscribe function to prevent memory leaks if listeners are dynamic.
- */
-export function subscribeToTelemetry(subscriber: TelemetrySubscriber): () => void {
-  telemetrySubscribers.add(subscriber);
-  return () => {
-    telemetrySubscribers.delete(subscriber);
-  };
-}
 
 /**
  * Runs a function within a new ExecutionContext.
@@ -119,12 +104,13 @@ export function endExecutionContext(status: "success" | "failed", error?: any): 
 
     // Dispatch to subscribers asynchronously to avoid blocking the main thread 
     // or disrupting the current execution flow if a subscriber errors.
-    if (telemetrySubscribers.size > 0) {
+    const subscribers = store.translatorContext?.telemetrySubscribers;
+    if (subscribers && subscribers.size > 0) {
        // Shallow clone to freeze the final state for telemetry, preventing accidental
        // delayed mutations by garbage collection artifacts.
        const snapshot = { ...store };
        
-       for (const subscriber of telemetrySubscribers) {
+       for (const subscriber of subscribers) {
           // Use Promise.resolve().then() to schedule on the microtask queue, 
           // allowing the current stack to finish immediately.
           Promise.resolve().then(async () => {

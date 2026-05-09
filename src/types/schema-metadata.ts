@@ -90,6 +90,7 @@ export type TTranslatorContext<
   TMetadata extends TSchemaMetadata<TDb, TTables> = TSchemaMetadata<TDb, TTables>,
 > = TSchemaContext<TDb, TTables, TMetadata> & {
   baseTableName: TTableNames<TDb, TTables, TMetadata>;
+  telemetrySubscribers?: Set<(ctx: any) => void | Promise<void>>;
 };
 
 export type TStrictSchemaMetadata<

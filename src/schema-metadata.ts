@@ -33,6 +33,15 @@ export function defineSchemaMetadata<
   return function <const TMetadata extends TSchemaMetadata<TDb, TTables>>(
     metadata: TMetadata,
   ) {
+    const telemetrySubscribers = new Set<(ctx: any) => void | Promise<void>>();
+
+    const subscribeToTelemetry = (subscriber: (ctx: ExecutionContext<any, any, any, any>) => void | Promise<void>) => {
+      telemetrySubscribers.add(subscriber);
+      return () => {
+        telemetrySubscribers.delete(subscriber);
+      };
+    };
+
     const repoFactory = <
       TName extends TTableNames<TDb, TTables, TMetadata>,
       TProfiles extends TProfileOptions<TDb, TTables, TMetadata, TName>,
@@ -49,6 +58,7 @@ export function defineSchemaMetadata<
         tables,
         metadata,
         baseTableName: tableName,
+        telemetrySubscribers,
       };
 
       const tableConfig = (metadata as any)[tableName] || {};
@@ -191,6 +201,7 @@ export function defineSchemaMetadata<
       tables,
       metadata,
       repoFactory,
+      subscribeToTelemetry,
     };
   };
 }

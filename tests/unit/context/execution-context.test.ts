@@ -1,5 +1,5 @@
 import { expect, test, describe, mock } from "bun:test";
-import { runInContext, useExecutionContext, getExecutionContext, updateContextMetadata, endExecutionContext, subscribeToTelemetry } from "../../../src/context/manager";
+import { runInContext, useExecutionContext, getExecutionContext, updateContextMetadata, endExecutionContext } from "../../../src/context/manager";
 import { getContext, setMetadata, getState, setState } from "../../../src/helper/context-helper";
 
 describe("Execution Context", () => {
@@ -44,19 +44,19 @@ describe("Execution Context", () => {
   });
 
   test("getContext shorthand works", async () => {
-    await runInContext({ action: "create" as any, tableName: "logs", params: {}, metadata: {} }, async () => {
+    await runInContext({ action: "create" as any, tableName: "logs", params: {}, metadata: {}, db: {} as any, schemaMetadata: {} as any, translatorContext: {} as any }, async () => {
       const ctx = getContext();
       expect(ctx.action).toBe("create");
     });
   });
 
   test("Context is isolated between parallel calls", async () => {
-    const call1 = runInContext({ action: "read" as any, tableName: "t1", params: {}, metadata: { id: 1 } }, async () => {
+    const call1 = runInContext({ action: "read" as any, tableName: "t1", params: {}, metadata: { id: 1 }, db: {} as any, schemaMetadata: {} as any, translatorContext: {} as any }, async () => {
       await new Promise(r => setTimeout(r, 10));
       return useExecutionContext().metadata.id;
     });
 
-    const call2 = runInContext({ action: "read" as any, tableName: "t2", params: {}, metadata: { id: 2 } }, async () => {
+    const call2 = runInContext({ action: "read" as any, tableName: "t2", params: {}, metadata: { id: 2 }, db: {} as any, schemaMetadata: {} as any, translatorContext: {} as any }, async () => {
       return useExecutionContext().metadata.id;
     });
 
@@ -88,14 +88,14 @@ describe("Execution Context", () => {
   });
 
   test("setMetadata updates context metadata", async () => {
-    await runInContext({ action: "read" as any, tableName: "users", params: {}, metadata: {} }, async () => {
+    await runInContext({ action: "read" as any, tableName: "users", params: {}, metadata: {}, db: {} as any, schemaMetadata: {} as any, translatorContext: {} as any }, async () => {
       setMetadata("orgId", "org-123");
       expect(useExecutionContext().metadata.orgId).toBe("org-123");
     });
   });
 
   test("setState and getState work for cross-middleware data sharing", async () => {
-    await runInContext({ action: "update" as any, tableName: "users", params: {}, metadata: {} }, async () => {
+    await runInContext({ action: "update" as any, tableName: "users", params: {}, metadata: {}, db: {} as any, schemaMetadata: {} as any, translatorContext: {} as any }, async () => {
       setState("isInternal", true);
       expect(getState("isInternal")).toBe(true);
       expect(useExecutionContext().state.isInternal).toBe(true);
@@ -105,7 +105,7 @@ describe("Execution Context", () => {
   test("Custom traceId generator works (sync)", async () => {
     const customGen = () => "custom-id";
     await runInContext(
-      { action: "read" as any, tableName: "users", params: {}, metadata: {} },
+      { action: "read" as any, tableName: "users", params: {}, metadata: {}, db: {} as any, schemaMetadata: {} as any, translatorContext: {} as any },
       async (ctx) => {
         expect(ctx.traceId).toBe("custom-id");
       },
@@ -116,7 +116,7 @@ describe("Execution Context", () => {
   test("Custom traceId generator works (async)", async () => {
     const customGen = async () => "async-id";
     await runInContext(
-      { action: "read" as any, tableName: "users", params: {}, metadata: {} },
+      { action: "read" as any, tableName: "users", params: {}, metadata: {}, db: {} as any, schemaMetadata: {} as any, translatorContext: {} as any },
       async (ctx) => {
         expect(ctx.traceId).toBe("async-id");
       },
@@ -132,13 +132,14 @@ describe("Execution Context", () => {
     expect(getExecutionContext()).toBeUndefined();
   });
 
-  test("Telemetry subscriber receives context on endExecutionContext", async () => {
+  test("Telemetry subscriber receives context on endExecutionContext via translatorContext", async () => {
     let capturedCtx: any = null;
-    const unsub = subscribeToTelemetry((ctx) => {
+    const telemetrySubscribers = new Set<any>();
+    telemetrySubscribers.add((ctx: any) => {
       capturedCtx = ctx;
     });
 
-    await runInContext({ action: "create" as any, tableName: "telemetry_test", params: {}, metadata: {} }, async () => {
+    await runInContext({ action: "create" as any, tableName: "telemetry_test", params: {}, metadata: {}, db: {} as any, schemaMetadata: {} as any, translatorContext: { telemetrySubscribers } as any }, async () => {
       endExecutionContext("success");
     });
 
@@ -149,7 +150,5 @@ describe("Execution Context", () => {
     expect(capturedCtx.tableName).toBe("telemetry_test");
     expect(capturedCtx.status).toBe("success");
     expect(capturedCtx.duration).toBeDefined();
-
-    unsub();
   });
 });
