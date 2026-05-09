@@ -4,7 +4,7 @@ import { executeSearchOne, executeSearchPage, executeSearchMany, executeSearchDe
 import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete";
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
-import { getTableName } from "drizzle-orm";
+import { findBaseTable } from "./helper";
 import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable } from "./types";
 import { composeMiddleware, createFieldRbacMiddleware, createHooksMiddleware, createRbacMiddleware } from "./middleware/exports";
 import type { Middleware, MiddlewareContext } from "./middleware/index";
@@ -63,7 +63,7 @@ export function defineSchemaMetadata<
         fieldRbacMiddleware
       ]);
 
-      const baseTable = tables.find((t) => getTableName(t) === tableName);
+      const baseTable = findBaseTable(tables, tableName);
 
       const executeWithMiddleware = (action: DbAction, profile: any, params: any, coreFn: any) => {
         const ctx: MiddlewareContext = {
