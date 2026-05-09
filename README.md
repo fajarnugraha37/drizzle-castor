@@ -1,12 +1,13 @@
 <h1 align="center">
   <a href="https://github.com/fajarnugraha37/drizzle-castor">
     <picture>
-      <img height="500" alt="GOUSS" src="https://raw.githubusercontent.com/fajarnugraha37drizzle-castor/refs/heads/main/docs/logo.png">
+      <img height="500" alt="drizzle-castor" src="https://raw.githubusercontent.com/fajarnugraha37/drizzle-castor/refs/heads/main/docs/logo.png">
     </picture>
   </a>
 </h1>
 <p align="center">
-    <em><b>drizzle-castor</b> is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over [Drizzle ORM](https://orm.drizzle.team/). It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
+    <em><b>drizzle-castor</b> is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over
+      <b><a href="https://orm.drizzle.team/" target="_blank">Drizzle ORM</a></b>. It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
     </em>
 </p>
 
@@ -24,8 +25,8 @@
 ## Features
 
 - **JSON-Based Querying (AST Translation)**: Filter, sort, and project relational data using intuitive JSON payloads (e.g., `{ filter: { "posts.title": { $like: "%Drizzle%" } } }`).
-- **Dialect Agnostic**: Seamlessly supports PostgreSQL, MySQL, and SQLite. Handles complex dialect-specific logic under the hood (e.g., `RETURNING` clauses vs. Temporary Tables for atomic mutations).
-- **Unified RBAC**: Built-in, middleware-driven Role-Based Access Control. Secure operations at the action and field levels (Intelligent Data Trimming).
+- **Dialect Agnostic**: Supports PostgreSQL, MySQL, and SQLite. Handles complex dialect-specific logic under the hood (e.g., `RETURNING` clauses vs. Temporary Tables for atomic mutations).
+- **Unified RBAC**: Built-in, middleware-driven Role-Based Access Control. Secure operations at the action and field levels (Data Trimming).
 - **Native Soft Deletes**: Declarative soft-delete capabilities that implicitly apply safety filters to queries and joins.
 - **Safe Pagination (Split Queries)**: Leverages Common Table Expressions (CTEs) to prevent Cartesian fan-out when paginating one-to-many relationships.
 
