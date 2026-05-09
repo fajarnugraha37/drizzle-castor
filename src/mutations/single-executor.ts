@@ -1,17 +1,9 @@
 import { sql, eq, inArray } from "drizzle-orm";
 import { generateTempTableName, supportsReturning, getTempTableCount } from "../helper/dialect-helper";
 import { buildSearchQueries, hydrateResults, parseFilter, isFilterSimple, buildExistsCondition } from "../query-parser";
+import { isMutated } from "../helper";
 import { MutationError } from "../errors";
 import type { MiddlewareContext } from "../middleware/index";
-
-/**
- * Helper to check if a mutation result indicates success.
- */
-function isMutated(result: any[] | number): boolean {
-  if (Array.isArray(result)) return result.length > 0;
-  if (typeof result === "number") return result > 0;
-  return !!result;
-}
 
 /**
  * Executes a single record mutation (One) with race-condition protection.
@@ -36,7 +28,7 @@ export async function executeSingleMutation(
 
   const effectiveFilter = operationFilter || { [pkName]: { $eq: idValue } };
 
-  // STRATEGY A: PostgreSQL / SQLite (Efficient .returning() + Transaction)
+  // STRATEGY A: PostgreSQL / SQLite (Efficient .returning() + Transaction for BUG-3)
   if (supportsReturning(db)) {
     return await db.transaction(async (tx: any) => {
       try {
