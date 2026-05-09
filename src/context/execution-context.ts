@@ -5,4 +5,4 @@ import type { ExecutionContext } from "../types/context";
  * The internal storage for the ExecutionContext.
  * We use AsyncLocalStorage for implicit context propagation.
  */
-export const contextStorage = new AsyncLocalStorage<ExecutionContext<any, any, any, any>>();
+export const executionContextStorage = new AsyncLocalStorage<ExecutionContext<any, any, any, any>>();

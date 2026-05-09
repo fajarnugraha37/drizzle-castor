@@ -1,4 +1,4 @@
-import { contextStorage } from "./execution-context";
+import { executionContextStorage } from "./execution-context";
 import type { AnyDatabase, AnyTable, ExecutionContext, TelemetrySubscriber } from "../types";
 import { assertSafeKey } from "../helper/assert-helper";
 import { defaultTraceIdGenerator } from "../helper/context-helper";
@@ -36,7 +36,7 @@ export async function runInContext<
   fn: (ctx: ExecutionContext<TDb, TTables, TMetadata, TState>) => Promise<T>,
   traceIdGenerator: () => string | Promise<string> = defaultTraceIdGenerator,
 ): Promise<T> {
-  const parent = contextStorage.getStore() as
+  const parent = executionContextStorage.getStore() as
     | ExecutionContext<TDb, TTables, TMetadata, TState>
     | undefined;
 
@@ -63,7 +63,7 @@ export async function runInContext<
     state: {} as TState,
   };
 
-  return contextStorage.run(context, () => fn(context));
+  return executionContextStorage.run(context, () => fn(context));
 }
 
 /**
@@ -76,7 +76,7 @@ export function useExecutionContext<
   TMetadata extends Record<string, any> = any,
   TState extends Record<string, any> = any,
 >(): ExecutionContext<TDb, TTables, TMetadata, TState> {
-  const store = contextStorage.getStore();
+  const store = executionContextStorage.getStore();
   if (!store) {
     throw new Error(
       "[Drizzle-Castor] ExecutionContext not found. Ensure you are calling this within a Repository method.",
@@ -89,14 +89,14 @@ export function useExecutionContext<
  * Safely tries to get the ExecutionContext. Returns undefined if not found.
  */
 export function getExecutionContext(): ExecutionContext<any, any, any, any> | undefined {
-  return contextStorage.getStore();
+  return executionContextStorage.getStore();
 }
 
 /**
  * Updates the current context's metadata.
  */
 export function updateContextMetadata(metadata: Record<string, any>): void {
-  const store = contextStorage.getStore();
+  const store = executionContextStorage.getStore();
   if (store) {
     for (const key of Object.keys(metadata)) {
       assertSafeKey(key, "updateContextMetadata");
@@ -110,7 +110,7 @@ export function updateContextMetadata(metadata: Record<string, any>): void {
  * Sets endTime, calculates duration, updates status, and dispatches to telemetry subscribers.
  */
 export function endExecutionContext(status: "success" | "failed", error?: any): void {
-  const store = contextStorage.getStore();
+  const store = executionContextStorage.getStore();
   if (store) {
     store.endTime = Date.now();
     store.duration = store.endTime - store.startTime;
