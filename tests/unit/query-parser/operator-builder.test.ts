@@ -12,8 +12,8 @@ describe("Query Parser: Operator Builder", () => {
       expect(buildFieldOperator(mockColumn, "$eq", undefined, mockDb)).toBeUndefined();
     });
 
-    test("Returns undefined for unknown operators", () => {
-      expect(buildFieldOperator(mockColumn, "$unknownOp", "val", mockDb)).toBeUndefined();
+    test("Throws for unknown operators", () => {
+      expect(() => buildFieldOperator(mockColumn, "$unknownOp", "val", mockDb)).toThrow();
     });
 
     test("Builds $eq operator", () => {
