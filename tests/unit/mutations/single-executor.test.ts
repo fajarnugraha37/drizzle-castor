@@ -48,6 +48,11 @@ describe("Single Executor", () => {
 
   const mockTx = {
     execute: mock(async () => ({})),
+    select: mock(() => ({
+      from: mock(() => ({
+        where: mock(() => ({})),
+      })),
+    })),
   } as any;
 
   beforeEach(() => {
