@@ -108,7 +108,13 @@ export async function buildSearchQueries<T>(
 ) {
   const { db, tables, metadata, baseTableName } = context;
 
-  const baseTable = tables.find((t) => getTableName(t) === baseTableName);
+  console.log("buildSearchQueries called with baseTableName:", baseTableName);
+  const baseTable = tables.find((t) => {
+    console.log("Checking table:", getTableName(t));
+    return getTableName(t) === baseTableName;
+  });
+  console.log("Found baseTable:", !!baseTable);
+  
   if (!baseTable) {
     throw new TableNotFoundError(`Base table '${baseTableName}' not found.`);
   }

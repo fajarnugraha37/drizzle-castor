@@ -4,6 +4,7 @@ export * from "./helper";
 export * from "./hook";
 export * from "./middleware";
 export * from "./query";
+export * from "./rbac";
 export * from "./repository";
 export * from "./schema-metadata";
 export * from "./value";

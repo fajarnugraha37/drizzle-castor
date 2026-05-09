@@ -3,25 +3,6 @@ import type { FlattenPaths, DeepPick, SearchQuery, FilterQuery, UpdateSet } from
 import type { AnyDatabase, AnyTable } from "./schema-metadata";
 import type { InferInsert } from "./value";
 
-// --- REPOSITORY PROFILES CONFIGURATION ---
-export type RepoProfileConfig<
-  TSchema extends {
-    db: AnyDatabase;
-    tables: readonly AnyTable[];
-    metadata: any;
-  },
-  TTableName extends string,
-  TEntityPaths = FlattenPaths<InferEntity<TSchema, TTableName, []>, "", 2> | "*",
-  TInsertKeys =
-    | (keyof InferInsert<FindTable<TSchema["tables"], TTableName>> & string)
-    | "*",
-> = {
-  allowedSets?: readonly TInsertKeys[];
-  allowedProjections?: readonly TEntityPaths[];
-  allowedFilters?: readonly TEntityPaths[];
-  allowedSorts?: readonly TEntityPaths[];
-};
-
 export type DbQueryResult<TEntity, Q extends { projection?: any }> =
   Q["projection"] extends Array<string>
     ? DeepPick<TEntity, Q["projection"][number]>
@@ -34,8 +15,6 @@ export type Repository<
     metadata: any;
   },
   TTableName extends string,
-  TProfiles extends Record<string, any>,
-  TProfileNames = keyof TProfiles | (string & {}),
   TEntity = InferEntity<TSchema, TTableName>,
   TInsert = InferInsert<FindTable<TSchema["tables"], TTableName>>,
 > = {
@@ -49,20 +28,20 @@ export type Repository<
   // --- CORE METHODS ---
   createOne: (
     data: TInsert,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<TEntity>;
   createMany: (
     data: TInsert[],
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<TEntity[]>;
 
   searchOne: <Q extends Pick<SearchQuery<TEntity>, "projection" | "filter" | "order">>(
     query: Q,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<DbQueryResult<TEntity, Q> | null>;
   searchPage: <Q extends SearchQuery<TEntity>>(
     query: Q,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<{
     data: DbQueryResult<TEntity, Q>[];
     meta: {
@@ -74,18 +53,18 @@ export type Repository<
   }>;
   searchMany: <Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">>(
     query: Q,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<DbQueryResult<TEntity, Q>[]>;
 
   searchDeletedOne: <
     Q extends Pick<SearchQuery<TEntity>, "projection" | "filter" | "order">,
   >(
     query: Q,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<DbQueryResult<TEntity, Q> | null>;
   searchDeletedPage: <Q extends SearchQuery<TEntity>>(
     query: Q,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<{
     data: DbQueryResult<TEntity, Q>[];
     meta: {
@@ -99,44 +78,44 @@ export type Repository<
     Q extends Omit<SearchQuery<TEntity>, "page" | "pageSize">,
   >(
     query: Q,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<DbQueryResult<TEntity, Q>[]>;
 
   updateOne: (
     id: string | number,
     set: UpdateSet<NonNullable<TInsert>>,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<TEntity | null>;
   updateMany: (
     filter: FilterQuery<TEntity>,
     set: UpdateSet<NonNullable<TInsert>>,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<TEntity[]>;
 
   softDeleteOne: (
     id: string | number,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<boolean>;
   softDeleteMany: (
     filter: FilterQuery<TEntity>,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<number>;
 
   restoreOne: (
     id: string | number,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<boolean>;
   restoreMany: (
     filter: FilterQuery<TEntity>,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<number>;
 
   hardDeleteOne: (
     id: string | number,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<boolean>;
   hardDeleteMany: (
     filter: FilterQuery<TEntity>,
-    profile?: TProfileNames | TProfileNames[],
+    profile?: string | string[],
   ) => Promise<number>;
 };

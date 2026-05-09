@@ -5,8 +5,9 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
 import { findBaseTable } from "./helper";
-import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig } from "./types";
-import { composeMiddleware, createFieldRbacMiddleware, createRbacMiddleware } from "./middleware";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, GlobalPolicyDefinition } from "./types";
+import { composeMiddleware } from "./middleware";
+import { createUnifiedRbacMiddleware } from "./middleware/unified-rbac";
 import type { ExecutionContext } from "./types/context";
 import { runInContext, endExecutionContext, useExecutionContext } from "./context/manager";
 
@@ -18,6 +19,8 @@ export function defineSchemaMetadata<
   tables: TTables, 
   mode: "strict" | "lenient" = "lenient",
   registeredMiddlewares: { middleware: Middleware, config?: MiddlewareConfig<TTables> }[] = [],
+  registeredPolicies: Map<string, PolicyDefinition<any, any, any>> = new Map(),
+  globalPolicy: GlobalPolicyDefinition<any, any> | undefined = undefined,
   isThrowError: boolean = false,
   traceIdGenerator?: TraceIdGenerator
 ) {
@@ -26,8 +29,6 @@ export function defineSchemaMetadata<
       "[Drizzle-Castor] Warning: Running in lenient mode. Unprotected tables will allow all actions by default.",
     );
   }
-
-  const tableRbacMiddleware = createRbacMiddleware(mode);
 
   return function <const TMetadata extends TSchemaMetadata<TDb, TTables>>(
     metadata: TMetadata,
@@ -43,14 +44,11 @@ export function defineSchemaMetadata<
 
     const repoFactory = <
       TName extends TTableNames<TDb, TTables, TMetadata>,
-      TProfiles extends TProfileOptions<TDb, TTables, TMetadata, TName>,
     >(
       tableName: TName,
-      options: TProfiles,
     ): Repository<
       TSchemaContext<TDb, TTables, TMetadata>,
-      TName,
-      TProfiles
+      TName
     > => {
       const translatorContext = {
         db,
@@ -60,7 +58,15 @@ export function defineSchemaMetadata<
         telemetrySubscribers,
       };
       
-      const fieldRbacMiddleware = createFieldRbacMiddleware(options as any, mode, isThrowError);
+      let policyDef = registeredPolicies.get(tableName as string);
+      
+      if (!policyDef && globalPolicy) {
+        policyDef = async (ctx: any, activeProfiles: string[]) => {
+          return globalPolicy(ctx, tableName as string, activeProfiles);
+        };
+      }
+
+      const unifiedRbacMiddleware = createUnifiedRbacMiddleware(policyDef, mode, isThrowError);
 
       const applicableMiddlewares: Middleware[] = [];
 
@@ -87,11 +93,10 @@ export function defineSchemaMetadata<
         applicableMiddlewares.push(wrappedMiddleware);
       }
 
-      // Stack: Global & Table Middlewares -> Table RBAC -> Field RBAC -> Core Action
+      // Stack: Global & Table Middlewares -> Unified RBAC -> Core Action
       const pipeline = composeMiddleware([
         ...applicableMiddlewares,
-        tableRbacMiddleware,
-        fieldRbacMiddleware
+        unifiedRbacMiddleware
       ]);
 
       const baseTable = findBaseTable(tables, tableName);

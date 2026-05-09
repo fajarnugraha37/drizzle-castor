@@ -9,7 +9,6 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type { AnyD1Database } from "drizzle-orm/d1";
 import type { TableConfig } from "./hook";
-import type { RepoProfileConfig } from "./repository";
 
 export type AnyDatabase =
   | BunSQLiteDatabase
@@ -121,24 +120,3 @@ export type TTableNames<
   TTables extends readonly AnyTable[],
   TMetadata extends TSchemaMetadata<TDb, TTables>,
 > = keyof TMetadata & string;
-
-export type TProfileNames<
-  TDb extends AnyDatabase,
-  TTables extends readonly AnyTable[],
-  TMetadata extends TSchemaMetadata<TDb, TTables>,
-  TName extends TTableNames<TDb, TTables, TMetadata>,
-> = TMetadata[TName] extends { profiles: infer P }
-  ? keyof P & string
-  : "default";
-
-export type TProfileOptions<
-  TDb extends AnyDatabase,
-  TTables extends readonly AnyTable[],
-  TMetadata extends TSchemaMetadata<TDb, TTables>,
-  TName extends TTableNames<TDb, TTables, TMetadata>,
-> = {
-  [K in TProfileNames<TDb, TTables, TMetadata, TName> | (string & {})]?: RepoProfileConfig<
-    TSchemaContext<TDb, TTables, TMetadata>,
-    TName
-  >;
-};

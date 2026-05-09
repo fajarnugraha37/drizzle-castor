@@ -1,12 +1,16 @@
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig } from "./types";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition } from "./types";
 
 export class SchemaBuilder<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],
   TMetadata extends Record<string, any> = {},
+  TProfiles extends readonly string[] = ["default"],
 > {
   private registeredMiddlewares: { middleware: Middleware, config?: MiddlewareConfig<TTables> }[] = [];
+  private registeredProfiles: string[] = ["default"];
+  private registeredPolicies: Map<string, PolicyDefinition<any, any, any>> = new Map();
+  private globalPolicy?: GlobalPolicyDefinition<any, any>;
   private isThrowError: boolean = false;
   private traceIdGenerator?: TraceIdGenerator;
 
@@ -16,6 +20,39 @@ export class SchemaBuilder<
     private mode: "strict" | "lenient",
     private metadata: TMetadata = {} as TMetadata,
   ) {}
+
+  profiles<const P extends readonly string[]>(profiles: P): SchemaBuilder<TDb, TTables, TMetadata, P> {
+    const newBuilder = new SchemaBuilder<TDb, TTables, TMetadata, P>(
+      this.db,
+      this.tables,
+      this.mode,
+      this.metadata as any
+    );
+    newBuilder.registeredMiddlewares = [...this.registeredMiddlewares];
+    newBuilder.registeredProfiles = [...profiles];
+    newBuilder.registeredPolicies = new Map(this.registeredPolicies);
+    newBuilder.globalPolicy = this.globalPolicy;
+    newBuilder.isThrowError = this.isThrowError;
+    newBuilder.traceIdGenerator = this.traceIdGenerator;
+    return newBuilder;
+  }
+
+  policies(policy: GlobalPolicyDefinition<TSchemaContext<TDb, TTables, TMetadata>, TProfiles[number]>): this;
+  policies<TName extends TableName<TTables[number]>>(
+    tableName: TName,
+    policy: PolicyDefinition<TSchemaContext<TDb, TTables, TMetadata>, TName, TProfiles[number]>
+  ): this;
+  policies<TName extends TableName<TTables[number]>>(
+    arg1: TName | GlobalPolicyDefinition<TSchemaContext<TDb, TTables, TMetadata>, TProfiles[number]>,
+    arg2?: PolicyDefinition<TSchemaContext<TDb, TTables, TMetadata>, TName, TProfiles[number]>
+  ): this {
+    if (typeof arg1 === "function") {
+      this.globalPolicy = arg1 as any;
+    } else {
+      this.registeredPolicies.set(arg1 as string, arg2 as any);
+    }
+    return this;
+  }
 
   use(middleware: Middleware, config?: MiddlewareConfig<TTables>): this {
     this.registeredMiddlewares.push({ middleware, config });
@@ -35,18 +72,21 @@ export class SchemaBuilder<
   table<
     TName extends TableName<TTables[number]>,
     const TConfig extends TSchemaMetadata<TDb, TTables>[TName],
-  >(tableName: TName, config: TConfig): SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }> {
+  >(tableName: TName, config: TConfig): SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }, TProfiles> {
     const metadataWithNewTable = {
       ...this.metadata,
       [tableName]: config,
     };
-    const newBuilder = new SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }>(
+    const newBuilder = new SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }, TProfiles>(
       this.db,
       this.tables,
       this.mode,
       metadataWithNewTable as any,
     );
     newBuilder.registeredMiddlewares = [...this.registeredMiddlewares];
+    newBuilder.registeredProfiles = [...this.registeredProfiles];
+    newBuilder.registeredPolicies = new Map(this.registeredPolicies);
+    newBuilder.globalPolicy = this.globalPolicy;
     newBuilder.isThrowError = this.isThrowError;
     newBuilder.traceIdGenerator = this.traceIdGenerator;
     return newBuilder;
@@ -59,6 +99,8 @@ export class SchemaBuilder<
       this.tables,
       this.mode,
       this.registeredMiddlewares,
+      this.registeredPolicies,
+      this.globalPolicy,
       this.isThrowError,
       this.traceIdGenerator
     )(finalMetadata);
