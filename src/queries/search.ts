@@ -1,6 +1,5 @@
 import { buildSearchQueries, hydrateResults } from "../query-parser";
-import { injectSoftDeleteFilter } from "../helper";
-import { getTableColumns } from "drizzle-orm";
+import { injectSoftDeleteFilter, getPrimaryKeyColumnName, findBaseTable } from "../helper";
 import type { MiddlewareContext } from "../middleware/index";
 
 export async function executeSearchOne(
@@ -8,8 +7,10 @@ export async function executeSearchOne(
 ) {
   const { params, translatorContext } = ctx;
   const { tables, baseTableName } = translatorContext;
-  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
-  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+  
+  // FIX: Centralized table and PK resolution
+  const baseTable = findBaseTable(tables, baseTableName);
+  const pkName = getPrimaryKeyColumnName(baseTable);
 
   const q = await injectSoftDeleteFilter({ ...params.query, page: 1, pageSize: 1 }, translatorContext.metadata, ctx.tableName, "active");
   const { mainQuery, paths } = await buildSearchQueries(q as any, translatorContext, true);
@@ -28,8 +29,10 @@ export async function executeSearchPage(
   const pageSize = params.query?.pageSize ?? 10;
 
   const { tables, baseTableName } = translatorContext;
-  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
-  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+  
+  // FIX: Centralized table and PK resolution
+  const baseTable = findBaseTable(tables, baseTableName);
+  const pkName = getPrimaryKeyColumnName(baseTable);
 
   const q = await injectSoftDeleteFilter(params.query, translatorContext.metadata, ctx.tableName, "active");
 
@@ -40,7 +43,11 @@ export async function executeSearchPage(
   );
 
   const countResult = await countQuery;
-  const totalItems = Number(countResult[0]?.count || 0);
+  
+  // FIX: Robust count extraction handling potential bigint/string variations
+  const totalItemsRaw = countResult[0]?.count ?? countResult[0]?.["count"] ?? 0;
+  const totalItems = typeof totalItemsRaw === "bigint" ? Number(totalItemsRaw) : parseInt(String(totalItemsRaw), 10) || 0;
+  
   const totalPages = Math.ceil(totalItems / pageSize);
 
   if (totalItems === 0) {
@@ -64,8 +71,10 @@ export async function executeSearchMany(
 ) {
   const { params, translatorContext } = ctx;
   const { tables, baseTableName } = translatorContext;
-  const baseTable = tables.find((t: any) => t[Symbol.for("drizzle:Name")] === baseTableName || t.name === baseTableName || (t as any)[Symbol.for("drizzle:Table")]?.name === baseTableName) || tables[0];
-  const pkName = (Object.keys(getTableColumns(baseTable!)).find(k => (baseTable as any)[k].primary) || "id") as string;
+  
+  // FIX: Centralized table and PK resolution
+  const baseTable = findBaseTable(tables, baseTableName);
+  const pkName = getPrimaryKeyColumnName(baseTable);
 
   const q = await injectSoftDeleteFilter(params.query, translatorContext.metadata, ctx.tableName, "active");
 
