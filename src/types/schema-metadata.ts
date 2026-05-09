@@ -7,6 +7,7 @@ import { LibSQLDatabase } from "drizzle-orm/libsql";
 import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { MySql2Database } from "drizzle-orm/mysql2";
+import type { AnyD1Database } from "drizzle-orm/d1";
 import type { TableConfig } from "./hook";
 import type { RepoProfileConfig } from "./repository";
 
@@ -16,7 +17,8 @@ export type AnyDatabase =
   | LibSQLDatabase
   | PostgresJsDatabase
   | NodePgDatabase
-  | MySql2Database;
+  | MySql2Database
+  | AnyD1Database;
 export type AnyTable = AnySQLiteTable | AnyMySqlTable | AnyPgTable;
 
 export type TableName<T extends AnyTable> = T["_"]["name"];

@@ -16,28 +16,31 @@ type Prev = [never, 0, 1, 2, 3, 4, 5];
 
 /**
  * OPTIMIZED FLATTEN PATHS (Autocomplete Focus):
- * Only generates object property paths. 
- * Numeric indices are handled via Template Literal validation to prevent IDE lag.
+ * Robustly generates paths for both objects and arrays.
+ * Handles numeric indices natively to ensure deep type safety.
  */
 export type FlattenPaths<T, Prefix extends string = "", Depth extends number = RecursiveDepth> = 
   [Depth] extends [never] 
     ? never 
-    : T extends object
-      ? {
-          [K in keyof T]-?: K extends string | number
-            ? IsTraversable<T[K]> extends true
-                ? | `${Prefix}${K}`
-                  | FlattenPaths<LeafType<T[K]>, `${Prefix}${K}.`, Prev[Depth]>
-                : `${Prefix}${K}`
-            : never;
-        }[keyof T]
-      : never;
+    : NonNullable<T> extends ReadonlyArray<infer U>
+      ? | `${Prefix}${number}`
+        | FlattenPaths<U, `${Prefix}${number}.`, Prev[Depth]>
+      : T extends object
+        ? {
+            [K in keyof T]-?: K extends string | number
+              ? IsTraversable<T[K]> extends true
+                  ? | `${Prefix}${K}`
+                    | FlattenPaths<NonNullable<T[K]>, `${Prefix}${K}.`, Prev[Depth]>
+                  : `${Prefix}${K}`
+              : never;
+          }[keyof T]
+        : never;
 
 /**
  * DYNAMIC PATH VALIDATOR:
- * Allows the base FlattenPaths PLUS any numeric indexing patterns.
+ * Uses the recursive FlattenPaths to provide full type safety and autocomplete.
  */
-export type ValidPath<T> = FlattenPaths<T> | `${FlattenPaths<T>}.${number}` | `${FlattenPaths<T>}.${number}.${string}`;
+export type ValidPath<T> = FlattenPaths<T>;
 
 /**
  * OPTIMIZED VALUE LOOKUP:
@@ -130,12 +133,18 @@ export type FilterQuery<T> = Partial<Conjunctions<T>> & {
 export type OrderDirection = "asc" | "desc";
 export type NullsPosition = "first" | "last";
 
+/**
+ * Supported aggregation functions. 
+ * Whitelisted at the AST level in ast-compiler.ts.
+ */
+export type AggregateFunction = "min" | "max" | "avg" | "sum" | "count" | (string & {});;
+
 export type OrderFieldConfig =
   | OrderDirection
   | {
       direction?: OrderDirection;
       nulls?: NullsPosition;
-      aggregate?: "min" | "max" | "avg" | "sum" | "count";
+      aggregate?: AggregateFunction;
     };
 
 export type OrderQuery<T> = {
