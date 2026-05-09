@@ -5,11 +5,12 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
 import { findBaseTable } from "./helper";
-import type { AnyDatabase, TSchemaMetadata, TTableNames, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, GlobalPolicyDefinition } from "./types";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, GlobalPolicyDefinition, CastorEvents } from "./types";
 import { composeMiddleware } from "./middleware";
 import { createUnifiedRbacMiddleware } from "./middleware/unified-rbac";
 import type { ExecutionContext } from "./types/context";
 import { runInContext, endExecutionContext, useExecutionContext } from "./context/manager";
+import type { Emitter } from "mitt";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
@@ -21,6 +22,7 @@ export function defineSchemaMetadata<
   registeredMiddlewares: { middleware: Middleware, config?: MiddlewareConfig<TTables> }[] = [],
   registeredPolicies: Map<string, PolicyDefinition<any, any, any>> = new Map(),
   globalPolicy: GlobalPolicyDefinition<any, any> | undefined = undefined,
+  emitter?: Emitter<CastorEvents>,
   isThrowError: boolean = false,
   traceIdGenerator?: TraceIdGenerator
 ) {
@@ -56,6 +58,7 @@ export function defineSchemaMetadata<
         metadata,
         baseTableName: tableName,
         telemetrySubscribers,
+        emitter,
       };
       
       let policyDef = registeredPolicies.get(tableName as string);

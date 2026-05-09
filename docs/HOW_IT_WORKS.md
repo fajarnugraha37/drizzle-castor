@@ -107,16 +107,42 @@ Security is implemented natively using a robust Role-Based Access Control (RBAC)
 ### The `unified-rbac` Middleware
 Before any payload hits the translation layer or executor, it passes through the `createUnifiedRbacMiddleware`.
 
-1. **Policy Resolution**: The middleware evaluates the current table against a defined `policyDef`. Depending on the `profile` active in the context, it fetches the `UnifiedPolicyConfig`.
-2. **Action Level RBAC**: It checks if the current operation (`create`, `read`, `update`, `delete`, etc.) is permitted in the `allowedActions` array. If not, an `AccessDeniedError` is thrown immediately.
-3. **Data Trimming (Field Level RBAC)**:
-   - **Projections & Sorts**: Unpermitted fields requested in projections or order-bys are silently trimmed out, or rejected entirely depending on `isThrowError` settings.
+1. **Policy Resolution**: The middleware evaluates the current table against a defined `policyDef` registered via `builder.policies()`. Depending on the `profile` active in the context, it fetches the `UnifiedPolicyConfig`.
+2. **Hybrid Resolution**: 
+   - **Declarative**: Look up the active profile in a static Map object.
+   - **Imperative**: Execute an asynchronous callback function that computes the policy based on the full `ExecutionContext`, current `tableName`, and active `profiles`.
+3. **Action Level RBAC**: It checks if the current operation (`create`, `read`, `update`, `delete`, etc.) is permitted in the `allowedActions` array. If not, an `AccessDeniedError` is thrown immediately.
+4. **Data Trimming (Field Level RBAC)**:
+   - **Projections & Sorts**: Unpermitted fields requested in projections or order-bys are silently trimmed out (logged to `ctx.state.warnings`) or rejected entirely depending on `isThrowError` settings.
    - **Filters**: The `$and`/`$or` tree is recursively traversed (`trimFilterObj`). If a user tries to query against an unpermitted field (e.g., `passwordHash: { $eq: "..." }`), that specific filter node is discarded.
    - **Mutations (Sets/Creates)**: Any payload attempting to write to unauthorized columns is stripped before the database transaction begins.
 
 ---
 
-## 4. Multi-Dialect Support (PostgreSQL, MySQL, SQLite)
+## 4. Telemetry & Logging
+
+`drizzle-castor` provides an industry-standard, event-driven telemetry system using the **`mitt`** library.
+
+### Event-Driven Architecture
+Instead of hardcoded `console` logs, the library emits structured events that developers can subscribe to via the `SchemaBuilder`.
+
+- **Asynchronous Emission**: All events are emitted via the microtask queue (`Promise.resolve().then()`), ensuring that logging logic never blocks the database transaction or adds latency to the response.
+- **Event Categories**:
+  - `execution`: Triggered after every repository action. Contains `tableName`, `action`, `duration`, `status`, and `traceId`.
+  - `security`: Triggered when RBAC trims fields or denies access.
+  - `error`: Triggered for all unhandled exceptions within the pipeline.
+  - `soft-deleted` / `restored` / `hard-deleted`: Triggered after successful mutations, carrying the primary keys or full records for audit logs.
+
+### Usage Example
+```typescript
+builder.on('execution', (ev) => {
+  console.log(`[${ev.traceId}] ${ev.action} on ${ev.tableName} took ${ev.duration}ms`);
+});
+```
+
+---
+
+## 5. Multi-Dialect Support (PostgreSQL, MySQL, SQLite)
 
 `drizzle-castor` provides strong guarantees on atomic mutations and prevents race conditions by leveraging specific database features. The library detects the current database dialect dynamically using duck-typing techniques in `getDialect()`.
 

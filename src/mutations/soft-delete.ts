@@ -52,6 +52,12 @@ export async function executeSoftDeleteOne(
 
   if (result) {
     ctx.state.affectedRecords = [result];
+    translatorContext.emitter?.emit("soft-deleted", {
+      tableName: baseTableName,
+      action: "softDelete",
+      records: [result],
+      traceId: ctx.traceId
+    });
     return true;
   }
 
@@ -93,5 +99,13 @@ export async function executeSoftDeleteMany(
   );
 
   ctx.state.affectedRecords = results;
+  if (results.length > 0) {
+    translatorContext.emitter?.emit("soft-deleted", {
+      tableName: baseTableName,
+      action: "softDelete",
+      records: results,
+      traceId: ctx.traceId
+    });
+  }
   return results.length;
 }

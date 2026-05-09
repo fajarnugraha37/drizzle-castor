@@ -1,7 +1,7 @@
 {
   "name": "@fajarnugraha37/drizzle-castor",
   "private": false,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A CRUD library for Drizzle ORM, designed to simplify database operations with a focus on type safety and ease of use.",
   "keywords": [
     "drizzle",
@@ -75,6 +75,7 @@
   "dependencies": {
     "@stacksjs/ts-cache": "^0.1.4",
     "drizzle-orm": "^0.45.2",
+    "mitt": "^3.0.1",
     "zod": "^4.4.3"
   }
 }

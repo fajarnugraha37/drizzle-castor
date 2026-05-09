@@ -8,6 +8,8 @@ import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type { AnyD1Database } from "drizzle-orm/d1";
+import type { Emitter } from "mitt";
+import type { CastorEvents } from "./telemetry";
 import type { TableConfig } from "./hook";
 
 export type AnyDatabase =
@@ -90,6 +92,7 @@ export type TTranslatorContext<
 > = TSchemaContext<TDb, TTables, TMetadata> & {
   baseTableName: TTableNames<TDb, TTables, TMetadata>;
   telemetrySubscribers?: Set<(ctx: any) => void | Promise<void>>;
+  emitter?: Emitter<CastorEvents>;
 };
 
 export type TStrictSchemaMetadata<

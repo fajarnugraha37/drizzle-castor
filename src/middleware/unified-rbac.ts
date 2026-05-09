@@ -38,6 +38,12 @@ function trimFilterObj(filter: any, allowedSet: Set<string> | "*", ctx?: any): a
         ctx.state.warnings = ctx.state.warnings || [];
         ctx.state.warnings.push(msg);
       }
+      ctx.translatorContext.emitter?.emit("security", {
+        type: "unknown_operator",
+        tableName: ctx.tableName,
+        message: msg,
+        action: ctx.action
+      });
     } else {
       if (isFieldAllowed(k, allowedSet)) {
         targetFilter[k] = v;
@@ -48,6 +54,13 @@ function trimFilterObj(filter: any, allowedSet: Set<string> | "*", ctx?: any): a
           ctx.state.warnings = ctx.state.warnings || [];
           ctx.state.warnings.push(msg);
         }
+        ctx.translatorContext.emitter?.emit("security", {
+          type: "field_trim",
+          tableName: ctx.tableName,
+          fields: [k],
+          message: msg,
+          action: ctx.action
+        });
       }
     }
   }
@@ -74,15 +87,32 @@ function handleFields(
   }
   
   if (rejected.length > 0) {
+    const msg = isThrowError 
+      ? `[Access Denied] Fields not allowed for ${actionName}: ${rejected.join(", ")}`
+      : `[RBAC] Trimming unallowed fields for ${actionName}: ${rejected.join(", ")}`;
+    
     if (isThrowError) {
-      throw new AccessDeniedError(`[Access Denied] Fields not allowed for ${actionName}: ${rejected.join(", ")}`);
+      ctx.translatorContext.emitter?.emit("security", {
+        type: "action_denied",
+        tableName: ctx.tableName,
+        message: msg,
+        fields: rejected,
+        action: ctx.action
+      });
+      throw new AccessDeniedError(msg);
     } else {
-      const msg = `[RBAC] Trimming unallowed fields for ${actionName}: ${rejected.join(", ")}`;
       console.warn(msg);
       if (ctx && ctx.state) {
         ctx.state.warnings = ctx.state.warnings || [];
         ctx.state.warnings.push(msg);
       }
+      ctx.translatorContext.emitter?.emit("security", {
+        type: "field_trim",
+        tableName: ctx.tableName,
+        fields: rejected,
+        message: msg,
+        action: ctx.action
+      });
     }
   }
   

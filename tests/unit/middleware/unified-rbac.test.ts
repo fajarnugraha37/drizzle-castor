@@ -9,6 +9,9 @@ describe("Unified RBAC Middleware - Declarative Policies", () => {
     profile,
     params: { query, set, data },
     state: {},
+    translatorContext: {
+      emitter: { emit: mock(() => {}) }
+    }
   } as any);
 
   const next = mock(() => Promise.resolve("success"));

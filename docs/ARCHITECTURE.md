@@ -104,15 +104,24 @@ The repository is organized into distinct domain boundaries to separate concerns
 ## 7. Cross-Cutting Concerns Implementation
 
 ### Authentication & Authorization
-- **Implementation**: Handled entirely via `createUnifiedRbacMiddleware`. Policies are defined on a per-table or global basis.
+- **Implementation**: Handled entirely via `createUnifiedRbacMiddleware`. Policies are defined on a per-table or global basis through `SchemaBuilder.policies()`.
 - **Pattern**: Middleware intercepts the action type (`create`, `read`, `update`, etc.) and the user profile, querying the policy definition before allowing the executor to run.
+- **Hybrid Support**: Supports both **Declarative** maps (Profile -> Config) and **Imperative** callbacks (Async switches based on table/action/context).
+- **Pattern**: Middleware intercepts the action type and user profile, resolving the dynamic or static policy definition. It performs intelligent data trimming for filters, projections, and mutation sets.
 
 ### Error Handling & Resilience
 - **Implementation**: Specific error classes (`MutationError`, `QueryParsingError`, `SecurityError`).
 - **Pattern**: Thrown internally and optionally caught or propagated. Strict race-condition protection is applied using transaction-bound Temporary Tables (MySQL) or `RETURNING` clauses.
 
 ### Logging & Monitoring
-- **Implementation**: Telemetry is gathered via `telemetrySubscribers` set on the translator context, wrapping execution context lifecycle events (`runInContext`).
+- **Implementation**: Event-driven architecture using **`mitt`**. Events are emitted as structured JSON objects.
+- **Event-Driven Dispatch**: Replaced legacy telemetry subscribers with an asynchronous event bus.
+- **Event Categories**:
+  - `execution`: Performance, audit trail, and result status.
+  - `security`: RBAC trimming, access denial events.
+  - `error`: Global exception interceptor.
+  - `soft-deleted`/`restored`/`hard-deleted`: Mutation record tracking.
+- **Non-Blocking**: Emissions use microtask queues to ensure zero impact on core database transaction latency.
 
 ## 8. Service Communication Patterns
 As a library, communication is primarily synchronous function invocation. Asynchronous patterns are utilized exclusively for physical database I/O (`Promises` over Drizzle async executors).

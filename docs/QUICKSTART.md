@@ -89,11 +89,18 @@ Instead of throwing hard errors when an unauthorized field is requested, the RBA
 *Note on JSON & Relations:* Field rules fully support JSON dot-notation and relational paths. Allowing a parent path (e.g., `"settings"`) implicitly allows querying any nested JSON property within it (e.g., `"settings.theme"`).
 
 ### E. Static vs Dynamic Policies
-Policies can be statically defined objects or asynchronous functions that resolve rules dynamically based on the current `ExecutionContext` (which carries contextual data like tenant IDs or request headers).
+Policies can be defined as static objects or asynchronous functions that resolve rules dynamically based on the current `ExecutionContext` (which carries contextual data like tenant IDs or request headers).. You can also define a **Global Policy** that applies to all tables as a fallback.
 
 ```typescript
 schemaMetadataBuilder.profiles(['default', 'public', 'admin', 'tenant_user'] as const);
 
+// 1. Global Fallback Policy
+schemaMetadataBuilder.policies(async (ctx, tableName, activeProfiles) => {
+  if (activeProfiles.includes("admin")) return { allowedActions: "*" };
+  return { allowedActions: ["read"] }; // Read-only fallback for all tables
+});
+
+// 2. Table-Specific Policies
 schemaMetadataBuilder.policies('users', {
   // 1. Static Policy: Applied consistently to the 'public' profile
   public: { 
@@ -101,7 +108,7 @@ schemaMetadataBuilder.policies('users', {
     allowedFilters: ["name", "email", "settings.theme"], // Allows filtering on JSON properties!
     allowedProjections: ["name", "profile.bio"], // Allows fetching relational data!
   },
-  
+
   // 2. Static Wildcard: Full access for 'admin'
   admin: {
     allowedActions: "*",
@@ -110,11 +117,11 @@ schemaMetadataBuilder.policies('users', {
     allowedFilters: "*",
     allowedSorts: "*"
   },
-
+  
   // 3. Dynamic Policy: Resolves permissions at runtime
   tenant_user: async (ctx) => {
     // Inspect ctx variables set by upstream authentication middlewares
-    const isOwner = ctx.params.filter?.id?.$eq === ctx.variables?.userId;
+    const isOwner = ctx.params.filter?.id?.$eq === ctx.state.userId;
     
     return {
       allowedActions: isOwner ? ["read", "update"] : ["read"],
@@ -142,14 +149,6 @@ export const schemaMetadata = schemaMetadataBuilder.build();
 
 // Create a typed Repository for the "users" table
 const userRepo = schemaMetadata.repoFactory("users");
-```
-
-You can also override or append specific RBAC configurations at the repository generation level:
-
-```typescript
-const userRepo = schemaMetadata.repoFactory("users", {
-  public: { allowedProjections: ["id", "name"] } // Local override
-});
 ```
 
 ---

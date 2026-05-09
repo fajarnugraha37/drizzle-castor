@@ -108,8 +108,36 @@ export function endExecutionContext(status: "success" | "failed", error?: any): 
     store.status = status;
     if (error) store.error = error;
 
-    // Dispatch to subscribers asynchronously to avoid blocking the main thread 
-    // or disrupting the current execution flow if a subscriber errors.
+    // --- NEW: Emit structured events via mitt ---
+    const emitter = store.translatorContext?.emitter;
+    if (emitter) {
+      const payload = {
+        tableName: store.tableName,
+        action: store.action,
+        profile: store.profile,
+        params: store.params,
+        duration: store.duration!,
+        status: status as any,
+        error: store.error,
+        traceId: store.traceId,
+        spanId: store.spanId,
+      };
+
+      // Asynchronous emission
+      Promise.resolve().then(() => {
+        emitter.emit("execution", payload);
+        if (status === "failed") {
+          emitter.emit("error", {
+            error: store.error,
+            tableName: store.tableName,
+            action: store.action,
+            traceId: store.traceId,
+          });
+        }
+      });
+    }
+
+    // Dispatch to legacy subscribers asynchronously
     const subscribers = store.translatorContext?.telemetrySubscribers;
     if (subscribers && subscribers.size > 0) {
        // Shallow clone to freeze the final state for telemetry, preventing accidental

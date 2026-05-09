@@ -7,4 +7,5 @@ export * from "./query";
 export * from "./rbac";
 export * from "./repository";
 export * from "./schema-metadata";
+export * from "./telemetry";
 export * from "./value";

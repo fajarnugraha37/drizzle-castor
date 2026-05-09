@@ -1,5 +1,6 @@
+import mitt from "mitt";
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition } from "./types";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition, CastorEvents } from "./types";
 
 export class SchemaBuilder<
   TDb extends AnyDatabase,
@@ -13,6 +14,7 @@ export class SchemaBuilder<
   private globalPolicy?: GlobalPolicyDefinition<any, any>;
   private isThrowError: boolean = false;
   private traceIdGenerator?: TraceIdGenerator;
+  private emitter = mitt<CastorEvents>();
 
   constructor(
     private db: TDb,
@@ -34,7 +36,18 @@ export class SchemaBuilder<
     newBuilder.globalPolicy = this.globalPolicy;
     newBuilder.isThrowError = this.isThrowError;
     newBuilder.traceIdGenerator = this.traceIdGenerator;
+    newBuilder.emitter = this.emitter;
     return newBuilder;
+  }
+
+  on<K extends keyof CastorEvents>(type: K, handler: (event: CastorEvents[K]) => void) {
+    this.emitter.on(type, handler);
+    return this;
+  }
+
+  off<K extends keyof CastorEvents>(type: K, handler: (event: CastorEvents[K]) => void) {
+    this.emitter.off(type, handler);
+    return this;
   }
 
   policies(policy: GlobalPolicyDefinition<TSchemaContext<TDb, TTables, TMetadata>, TProfiles[number]>): this;
@@ -101,6 +114,7 @@ export class SchemaBuilder<
       this.registeredMiddlewares,
       this.registeredPolicies,
       this.globalPolicy,
+      this.emitter,
       this.isThrowError,
       this.traceIdGenerator
     )(finalMetadata);

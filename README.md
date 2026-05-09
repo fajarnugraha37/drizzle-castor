@@ -1,7 +1,7 @@
 <h1 align="center">
   <a href="https://github.com/fajarnugraha37/drizzle-castor">
     <picture>
-      <img height="500" alt="GOUSS" src="https://raw.githubusercontent.com/fajarnugraha37drizzle-castor/refs/heads/main/docs/logo.png">
+      <img height="500" alt="Drizzle Castor" src="https://raw.githubusercontent.com/fajarnugraha37drizzle-castor/refs/heads/main/docs/logo-001.png">
     </picture>
   </a>
 </h1>
@@ -24,10 +24,13 @@
 ## Features
 
 - **JSON-Based Querying (AST Translation)**: Filter, sort, and project relational data using intuitive JSON payloads (e.g., `{ filter: { "posts.title": { $like: "%Drizzle%" } } }`).
-- **Dialect Agnostic**: Seamlessly supports PostgreSQL, MySQL, and SQLite. Handles complex dialect-specific logic under the hood (e.g., `RETURNING` clauses vs. Temporary Tables for atomic mutations).
 - **Unified RBAC**: Built-in, middleware-driven Role-Based Access Control. Secure operations at the action and field levels (Intelligent Data Trimming).
+- **Unified Middleware Pipeline**: Adopts the **Koa-style Onion Model** for absolute control flow (`await next()`) on every request.
+- **Unified RBAC Policies**: Secure operations at the action and field levels with support for both **Declarative** (Object Map) and **Imperative** (Sync/Async Callbacks) definitions.
+- **Telemetry**: Event-driven logging system using **`mitt`**. Emits structured events for execution performance, security audit trails, and data mutations.
+- **Dialect Agnostic**: Seamlessly supports PostgreSQL, MySQL, and SQLite. Handles complex dialect-specific logic under the hood (e.g., `RETURNING` clauses vs. Temporary Tables).
 - **Native Soft Deletes**: Declarative soft-delete capabilities that implicitly apply safety filters to queries and joins.
-- **Safe Pagination (Split Queries)**: Leverages Common Table Expressions (CTEs) to prevent Cartesian fan-out when paginating one-to-many relationships.
+- **Safe Pagination (Split Queries)**: Leverages Common Table Expressions (CTEs) to prevent Cartesian fan-out when paginating one-to-many or many-to-many relationships.
 
 ---
 
@@ -54,6 +57,16 @@
 ```bash
 bun add @fajarnugraha37/drizzle-castor drizzle-orm
 ```
+
+### Documentation
+
+For detailed architectural diagrams and internal mechanics, refer to the following documentation:
+- [Project Architecture Blueprint](./docs/ARCHITECTURE.md)
+- [How It Works](./docs/HOW_IT_WORKS.md)
+- [Coding Standards](./docs/CODING_STANDARDS.md)
+- [Typescript Type](./docs/TYPE_SYSTEM.md)
+- [Testing](./docs/TESTING.md)
+
 
 ### Quick Usage
 
@@ -107,11 +120,6 @@ The library implements a **Middleware-Driven Repository Pattern** functioning as
         ▼
 [ Drizzle ORM ] -> [ Database Engine ]
 ```
-
-For detailed architectural diagrams and internal mechanics, refer to the following documentation:
-- [Project Architecture Blueprint](./docs/ARCHITECTURE.md)
-- [How It Works](./docs/HOW_IT_WORKS.md)
-- [Coding Standards](./docs/CODING_STANDARDS.md)
 
 ### Directory Structure
 ```text

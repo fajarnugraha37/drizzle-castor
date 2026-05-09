@@ -37,6 +37,12 @@ export async function executeHardDeleteOne(
 
   if (result) {
     ctx.state.affectedRecords = [result];
+    ctx.translatorContext.emitter?.emit("hard-deleted", {
+      tableName: ctx.translatorContext.baseTableName,
+      action: "hardDelete",
+      records: [result],
+      traceId: ctx.traceId
+    });
     return true;
   }
 
@@ -72,5 +78,13 @@ export async function executeHardDeleteMany(
   );
 
   ctx.state.affectedRecords = results;
+  if (results.length > 0) {
+    ctx.translatorContext.emitter?.emit("hard-deleted", {
+      tableName: ctx.translatorContext.baseTableName,
+      action: "hardDelete",
+      records: results,
+      traceId: ctx.traceId
+    });
+  }
   return results.length;
 }
