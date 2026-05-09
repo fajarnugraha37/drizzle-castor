@@ -47,6 +47,7 @@ export async function runInContext<
     translatorContext: data.translatorContext,
     state: {} as TState,
   };
+  (context as any)._startPerfTime = performance.now();
 
   return executionContextStorage.run(context, () => fn(context));
 }
@@ -98,7 +99,12 @@ export function endExecutionContext(status: "success" | "failed", error?: any): 
   const store = executionContextStorage.getStore();
   if (store) {
     store.endTime = Date.now();
-    store.duration = store.endTime - store.startTime;
+    const startPerfTime = (store as any)._startPerfTime;
+    if (startPerfTime) {
+      store.duration = performance.now() - startPerfTime;
+    } else {
+      store.duration = store.endTime - store.startTime;
+    }
     store.status = status;
     if (error) store.error = error;
 

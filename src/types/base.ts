@@ -16,7 +16,8 @@ export type CastorErrorCode =
   | "RELATION_NOT_FOUND"
   | "ALIAS_NOT_FOUND"
   | "CONFIGURATION_ERROR"
-  | "MUTATION_ERROR";
+  | "MUTATION_ERROR"
+  | "HOOK_ERROR";
 
 export type BaseSchema = {
   db: AnyDatabase;
