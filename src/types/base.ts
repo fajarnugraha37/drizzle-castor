@@ -2,7 +2,21 @@ import type { InferEntity, FindTable, InferModel } from "./helper";
 import type { SearchQuery, UpdateQuery, DeleteQuery } from "./query";
 import type { AnyDatabase, AnyTable } from "./schema-metadata";
 
+
 export type RecursiveDepth = 5;
+
+export type Dialect = "pg" | "mysql" | "sqlite";
+
+export type CastorErrorCode =
+  | "SECURITY_ERROR"
+  | "ACCESS_DENIED"
+  | "QUERY_PARSING_ERROR"
+  | "TABLE_NOT_FOUND"
+  | "COLUMN_NOT_FOUND"
+  | "RELATION_NOT_FOUND"
+  | "ALIAS_NOT_FOUND"
+  | "CONFIGURATION_ERROR"
+  | "MUTATION_ERROR";
 
 export type BaseSchema = {
   db: AnyDatabase;

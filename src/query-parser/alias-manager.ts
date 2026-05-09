@@ -1,10 +1,9 @@
 import { aliasedTable, getTableName, getTableColumns } from "drizzle-orm";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildJsonExtractionSql } from "./json-resolver";
-import type { AnyTable } from "../types";
+import type { AliasMap, AnyTable } from "../types";
 import { TableNotFoundError, AliasNotFoundError, ColumnNotFoundError } from "../errors";
 
-export type AliasMap = Map<string, AnyTable>;
 
 /**
  * Creates deterministic path-based aliases for Drizzle tables.

@@ -19,7 +19,10 @@ export type AnyDatabase =
   | NodePgDatabase
   | MySql2Database
   | AnyD1Database;
+
 export type AnyTable = AnySQLiteTable | AnyMySqlTable | AnyPgTable;
+
+export type AliasMap = Map<string, AnyTable>;
 
 export type TableName<T extends AnyTable> = T["_"]["name"];
 export type ColumnName<T extends AnyTable> = Extract<

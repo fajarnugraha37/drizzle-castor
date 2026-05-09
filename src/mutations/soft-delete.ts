@@ -3,10 +3,10 @@ import { parseUpdateSet as parseUpdateSetParser } from "../query-parser";
 import { executeBatchMutation } from "./batch-executor";
 import { executeSingleMutation } from "./single-executor";
 import { supportsReturning } from "../helper/dialect-helper";
-import type { MiddlewareContext } from "../middleware/index";
+import type { ExecutionContext } from "../types/context";
 
 export async function executeSoftDeleteOne(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
 ): Promise<boolean> {
   const { params, translatorContext } = ctx;
@@ -59,7 +59,7 @@ export async function executeSoftDeleteOne(
 }
 
 export async function executeSoftDeleteMany(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
 ): Promise<number> {
   const { params, translatorContext } = ctx;

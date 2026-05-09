@@ -1,9 +1,7 @@
-import { sql, getTableColumns } from "drizzle-orm";
+import { sql, getTableColumns, type Dialect } from "drizzle-orm";
 import { getTableConfig as getPgTableConfig } from "drizzle-orm/pg-core";
 import { getTableConfig as getMySqlTableConfig } from "drizzle-orm/mysql-core";
 import { getTableConfig as getSQLiteTableConfig } from "drizzle-orm/sqlite-core";
-
-export type Dialect = "pg" | "mysql" | "sqlite";
 
 /**
  * Detects the dialect of the given Drizzle database instance.

@@ -1,23 +1,5 @@
 import { QueryParsingError } from "../errors";
-
-export type RelationType =
-  | "oneToMany"
-  | "manyToMany"
-  | "oneToOne"
-  | "manyToOne";
-
-export type RelationNode = {
-  relationName: string;
-  relatedTable: string;
-  type: RelationType;
-  isArray: boolean;
-  foreignKey?: string;
-  localKey?: string;
-  joinTable?: string;
-  joinLocalKey?: string;
-  relatedKey?: string;
-  joinRelatedKey?: string;
-};
+import type { PathResolution, RelationNode, RelationType } from "../types";
 
 /**
  * Traverses the metadata to find the relation definition for a given relation name.
@@ -57,12 +39,6 @@ export function findRelationDefinition(
 export function isRelation(metadata: any, tableName: string, relationName: string): boolean {
   return findRelationDefinition(metadata, tableName, relationName) !== null;
 }
-
-export type PathResolution = {
-  nodes: RelationNode[];
-  jsonPath?: string;
-  relationPath: string; // The joined relation path
-};
 
 /**
  * Resolves a full dot-notation path (e.g., "posts.persona.hobbies") into an array of RelationNodes

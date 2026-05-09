@@ -3,7 +3,7 @@ import { generateTempTableName, supportsReturning, getTempTableCount } from "../
 import { buildSearchQueries, hydrateResults, parseFilter, isFilterSimple, buildExistsCondition } from "../query-parser";
 import { isMutated } from "../helper";
 import { MutationError } from "../errors";
-import type { MiddlewareContext } from "../middleware/index";
+import type { ExecutionContext } from "../types/context";
 
 /**
  * Executes a batch mutation (Many) with race-condition protection.
@@ -13,7 +13,7 @@ import type { MiddlewareContext } from "../middleware/index";
  * @param hydrateBefore If true, hydrates records BEFORE mutation (required for Hard Delete).
  */
 export async function executeBatchMutation(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
   pkName: string,
   mutationFn: (tx: any, whereClause: any) => Promise<any[] | number>,

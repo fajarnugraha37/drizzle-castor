@@ -4,15 +4,9 @@ import { analyzeQuery } from "./analyzer";
 import { buildAliases } from "./alias-manager";
 import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compiler";
 import { getPrimaryKeyColumnName, resolveProviderValues } from "../helper";
-import type { AnyTable, SearchQuery } from "../types";
+import type { SearchQuery, TranslatorContext } from "../types";
 import { TableNotFoundError } from "../errors";
 
-export type TranslatorContext = {
-  db: any;
-  tables: readonly AnyTable[];
-  metadata: any;
-  baseTableName: string;
-};
 
 /**
  * Checks if a filter only touches the base table (no relations).

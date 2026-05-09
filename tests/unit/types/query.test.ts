@@ -5,7 +5,7 @@ import {
   defineUpdateSet, 
   defineProjection, 
   defineInsertValue 
-} from "../../../src/types/query";
+} from "../../../src/helper";
 
 describe("Types: Identity Helpers", () => {
   test("defineFilter should return the filter as-is", () => {
@@ -25,7 +25,7 @@ describe("Types: Identity Helpers", () => {
 
   test("defineProjection should return the projection as-is", () => {
     const projection = ["id", "name"];
-    expect(defineProjection(projection)).toBe(projection);
+    expect(defineProjection(projection as any)).toBe(projection);
   });
 
   test("defineInsertValue should return the data as-is", () => {

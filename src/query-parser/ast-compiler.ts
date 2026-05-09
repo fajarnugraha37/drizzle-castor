@@ -1,11 +1,10 @@
 import { SQL, eq, asc, desc, sql, aliasedTable, getTableName, and, isNull, ne, or } from "drizzle-orm";
 import { getColumn } from "./alias-manager";
-import type { AliasMap } from "./alias-manager";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
 import { buildJsonExtractionSql } from "./json-resolver";
 import { getPrimaryKeyColumnName } from "../helper";
-import type { AnyDatabase } from "../types";
+import type { AliasMap, AnyDatabase } from "../types";
 import { AliasNotFoundError, QueryParsingError, SecurityError, TableNotFoundError } from "../errors";
 
 /**

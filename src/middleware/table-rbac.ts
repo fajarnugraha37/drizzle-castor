@@ -1,6 +1,5 @@
-import type { Middleware } from "./index";
 import { AccessDeniedError } from "../errors";
-import type { DbAction } from "../types";
+import type { DbAction, Middleware } from "../types";
 
 export function createRbacMiddleware(
   mode: "strict" | "lenient",

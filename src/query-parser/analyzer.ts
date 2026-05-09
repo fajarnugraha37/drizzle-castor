@@ -1,10 +1,5 @@
+import type { QueryPaths } from "../types";
 import { resolvePathSegments } from "./metadata-explorer";
-
-export type QueryPaths = {
-  ctePaths: Set<string>;
-  outerPaths: Set<string>;
-  needsGroupBy: boolean;
-};
 
 /**
  * Ensures a relation path and all its intermediate parent paths are added to the Set.

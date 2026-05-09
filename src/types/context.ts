@@ -43,10 +43,22 @@ export interface ExecutionContext<
   metadata: TMetadata;
   /** Internal state bag for middleware communication */
   state: TState;
-  /** The Drizzle database instance */
-  db: TDb;
-  /** The full schema metadata configuration */
-  schemaMetadata: TSchemaMetadata<TDb, TTables>;
   /** Schema metadata and database instances */
   translatorContext: TTranslatorContext<TDb, TTables>;
 }
+
+/**
+ * Type for telemetry listeners that want to process completed execution contexts.
+ */
+export type TelemetrySubscriber = (ctx: ExecutionContext<any, any, any, any>) => void | Promise<void>;
+
+export type TranslatorContext<
+  TDb extends AnyDatabase = AnyDatabase,
+  TTables extends readonly AnyTable[] = any,
+  TMetadata extends TSchemaMetadata<TDb, TTables> = any
+> = {
+  db: TDb;
+  tables: readonly AnyTable[];
+  metadata: TMetadata;
+  baseTableName: string;
+};

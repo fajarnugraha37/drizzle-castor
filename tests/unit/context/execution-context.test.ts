@@ -1,5 +1,5 @@
 import { expect, test, describe, mock } from "bun:test";
-import { runInContext, useExecutionContext, getExecutionContext, updateContextMetadata, endExecutionContext } from "../../../src/context/manager";
+import { runInContext, useExecutionContext, getExecutionContext, updateContextMetadata, endExecutionContext, subscribeToTelemetry } from "../../../src/context/manager";
 import { getContext, setMetadata, getState, setState } from "../../../src/helper/context-helper";
 
 describe("Execution Context", () => {
@@ -130,5 +130,26 @@ describe("Execution Context", () => {
 
   test("getExecutionContext returns undefined outside of context", () => {
     expect(getExecutionContext()).toBeUndefined();
+  });
+
+  test("Telemetry subscriber receives context on endExecutionContext", async () => {
+    let capturedCtx: any = null;
+    const unsub = subscribeToTelemetry((ctx) => {
+      capturedCtx = ctx;
+    });
+
+    await runInContext({ action: "create" as any, tableName: "telemetry_test", params: {}, metadata: {} }, async () => {
+      endExecutionContext("success");
+    });
+
+    // Need to wait briefly because the subscriber runs on a microtask
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(capturedCtx).not.toBeNull();
+    expect(capturedCtx.tableName).toBe("telemetry_test");
+    expect(capturedCtx.status).toBe("success");
+    expect(capturedCtx.duration).toBeDefined();
+
+    unsub();
   });
 });

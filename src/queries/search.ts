@@ -1,9 +1,9 @@
 import { buildSearchQueries, hydrateResults } from "../query-parser";
 import { injectSoftDeleteFilter, getPrimaryKeyColumnName, findBaseTable } from "../helper";
-import type { MiddlewareContext } from "../middleware/index";
+import type { ExecutionContext } from "../types/context";
 
 export async function executeSearchOne(
-  ctx: MiddlewareContext
+  ctx: ExecutionContext<any, any>
 ) {
   const { params, translatorContext } = ctx;
   const { tables, baseTableName } = translatorContext;
@@ -22,7 +22,7 @@ export async function executeSearchOne(
 }
 
 export async function executeSearchPage(
-  ctx: MiddlewareContext
+  ctx: ExecutionContext<any, any>
 ) {
   const { params, translatorContext } = ctx;
   const page = params.query?.page ?? 1;
@@ -67,7 +67,7 @@ export async function executeSearchPage(
 }
 
 export async function executeSearchMany(
-  ctx: MiddlewareContext
+  ctx: ExecutionContext<any, any>
 ) {
   const { params, translatorContext } = ctx;
   const { tables, baseTableName } = translatorContext;

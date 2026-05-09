@@ -1,7 +1,22 @@
-import { contextStorage, type ExecutionContext } from "./execution-context";
-import type { AnyDatabase, AnyTable } from "../types";
+import { contextStorage } from "./execution-context";
+import type { AnyDatabase, AnyTable, ExecutionContext, TelemetrySubscriber } from "../types";
 import { assertSafeKey } from "../helper/assert-helper";
 import { defaultTraceIdGenerator } from "../helper/context-helper";
+
+
+// Global registry for telemetry subscribers
+const telemetrySubscribers: Set<TelemetrySubscriber> = new Set();
+
+/**
+ * Registers a telemetry subscriber to listen for completed execution contexts.
+ * Returns an unsubscribe function to prevent memory leaks if listeners are dynamic.
+ */
+export function subscribeToTelemetry(subscriber: TelemetrySubscriber): () => void {
+  telemetrySubscribers.add(subscriber);
+  return () => {
+    telemetrySubscribers.delete(subscriber);
+  };
+}
 
 /**
  * Runs a function within a new ExecutionContext.
@@ -44,8 +59,6 @@ export async function runInContext<
       ...(parent?.metadata || {}),
       ...(data.metadata || {}),
     } as TMetadata,
-    db: data.db,
-    schemaMetadata: data.schemaMetadata,
     translatorContext: data.translatorContext,
     state: {} as TState,
   };
@@ -94,7 +107,7 @@ export function updateContextMetadata(metadata: Record<string, any>): void {
 
 /**
  * Finalizes the current ExecutionContext.
- * Sets endTime, calculates duration, and updates status.
+ * Sets endTime, calculates duration, updates status, and dispatches to telemetry subscribers.
  */
 export function endExecutionContext(status: "success" | "failed", error?: any): void {
   const store = contextStorage.getStore();
@@ -103,5 +116,25 @@ export function endExecutionContext(status: "success" | "failed", error?: any): 
     store.duration = store.endTime - store.startTime;
     store.status = status;
     if (error) store.error = error;
+
+    // Dispatch to subscribers asynchronously to avoid blocking the main thread 
+    // or disrupting the current execution flow if a subscriber errors.
+    if (telemetrySubscribers.size > 0) {
+       // Shallow clone to freeze the final state for telemetry, preventing accidental
+       // delayed mutations by garbage collection artifacts.
+       const snapshot = { ...store };
+       
+       for (const subscriber of telemetrySubscribers) {
+          // Use Promise.resolve().then() to schedule on the microtask queue, 
+          // allowing the current stack to finish immediately.
+          Promise.resolve().then(async () => {
+            try {
+              await subscriber(snapshot);
+            } catch (err) {
+              console.error("[Drizzle-Castor Telemetry Error] Subscriber failed:", err);
+            }
+          });
+       }
+    }
   }
 }

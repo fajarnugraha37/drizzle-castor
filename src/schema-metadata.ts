@@ -5,10 +5,10 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
 import { findBaseTable } from "./helper";
-import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator } from "./types";
-import { composeMiddleware, createFieldRbacMiddleware, createHooksMiddleware, createRbacMiddleware } from "./middleware/exports";
-import type { Middleware, MiddlewareContext } from "./middleware/index";
-import { runInContext, endExecutionContext } from "./context/manager";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware } from "./types";
+import { composeMiddleware, createFieldRbacMiddleware, createHooksMiddleware, createRbacMiddleware } from "./middleware";
+import type { ExecutionContext } from "./types/context";
+import { runInContext, endExecutionContext, useExecutionContext } from "./context/manager";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
@@ -75,19 +75,10 @@ export function defineSchemaMetadata<
             profile,
             params,
             metadata: {}, // Initial empty metadata
-            db,
-            schemaMetadata: metadata,
             translatorContext,
           },
           async () => {
-            const ctx: MiddlewareContext = {
-              action,
-              tableName,
-              profile,
-              params,
-              translatorContext,
-              state: {},
-            };
+            const ctx = useExecutionContext();
 
             try {
               const result = await pipeline(ctx, async () => {
@@ -113,82 +104,82 @@ export function defineSchemaMetadata<
         defineInsertValue: (i) => i,
 
         createOne: async (data, profile) => {
-          return executeWithMiddleware("create", profile, { data }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("create", profile, { data }, (ctx: ExecutionContext) => 
             executeCreateOne(ctx, baseTable)
           );
         },
         createMany: async (data, profile) => {
-          return executeWithMiddleware("create", profile, { data }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("create", profile, { data }, (ctx: ExecutionContext) => 
             executeCreateMany(ctx, baseTable)
           );
         },
         searchOne: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
             executeSearchOne(ctx)
           );
         },
         searchPage: async (query, profile) => {
-          return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
             executeSearchPage(ctx)
           );
         },
         searchMany: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
             executeSearchMany(ctx)
           );
         },
         searchDeletedOne: async (query, profile) => {
-          return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
             executeSearchDeletedOne(ctx)
           );
         },
         searchDeletedPage: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
             executeSearchDeletedPage(ctx)
           );
         },
         searchDeletedMany: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: MiddlewareContext) => 
+           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
             executeSearchDeletedMany(ctx)
           );
         },
         updateOne: async (id, set, profile) => {
-           return executeWithMiddleware("update", profile, { id, set }, (ctx: MiddlewareContext) => 
+           return executeWithMiddleware("update", profile, { id, set }, (ctx: ExecutionContext) => 
             executeUpdateOne(ctx, baseTable)
           );
         },
         updateMany: async (filter, set, profile) => {
-          return executeWithMiddleware("update", profile, { filter, set }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("update", profile, { filter, set }, (ctx: ExecutionContext) => 
             executeUpdateMany(ctx, baseTable)
           );
         },
         softDeleteOne: async (id, profile) => {
-          return executeWithMiddleware("softDelete", profile, { id }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("softDelete", profile, { id }, (ctx: ExecutionContext) => 
             executeSoftDeleteOne(ctx, baseTable)
           );
         },
         softDeleteMany: async (filter, profile) => {
-          return executeWithMiddleware("softDelete", profile, { filter }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("softDelete", profile, { filter }, (ctx: ExecutionContext) => 
             executeSoftDeleteMany(ctx, baseTable)
           );
         },
         restoreOne: async (id, profile) => {
-          return executeWithMiddleware("restore", profile, { id }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("restore", profile, { id }, (ctx: ExecutionContext) => 
             executeRestoreOne(ctx, baseTable)
           );
         },
         restoreMany: async (filter, profile) => {
-          return executeWithMiddleware("restore", profile, { filter }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("restore", profile, { filter }, (ctx: ExecutionContext) => 
             executeRestoreMany(ctx, baseTable)
           );
         },
         hardDeleteOne: async (id, profile) => {
-           return executeWithMiddleware("hardDelete", profile, { id }, (ctx: MiddlewareContext) => 
+           return executeWithMiddleware("hardDelete", profile, { id }, (ctx: ExecutionContext) => 
             executeHardDeleteOne(ctx, baseTable)
           );
         },
         hardDeleteMany: async (filter, profile) => {
-          return executeWithMiddleware("hardDelete", profile, { filter }, (ctx: MiddlewareContext) => 
+          return executeWithMiddleware("hardDelete", profile, { filter }, (ctx: ExecutionContext) => 
             executeHardDeleteMany(ctx, baseTable)
           );
         },

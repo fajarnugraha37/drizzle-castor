@@ -1,8 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { ExecutionContext } from "../types/context";
 
-export type { ExecutionContext };
-
 /**
  * The internal storage for the ExecutionContext.
  * We use AsyncLocalStorage for implicit context propagation.

@@ -3,10 +3,10 @@ import { parseUpdateSet } from "../query-parser";
 import { executeBatchMutation } from "./batch-executor";
 import { executeSingleMutation } from "./single-executor";
 import { supportsReturning } from "../helper/dialect-helper";
-import type { MiddlewareContext } from "../middleware/index";
+import type { ExecutionContext } from "../types/context";
 
 export async function executeUpdateOne(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
 ) {
   const { params, translatorContext } = ctx;
@@ -45,7 +45,7 @@ export async function executeUpdateOne(
 }
 
 export async function executeUpdateMany(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
 ) {
   const { params, translatorContext } = ctx;

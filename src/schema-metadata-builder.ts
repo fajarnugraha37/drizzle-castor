@@ -1,6 +1,5 @@
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator } from "./types";
-import type { Middleware } from "./middleware/index";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware } from "./types";
 
 export class SchemaBuilder<
   TDb extends AnyDatabase,

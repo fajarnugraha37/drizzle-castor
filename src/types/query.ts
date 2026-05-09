@@ -10,6 +10,31 @@ export type Primitive =
   | symbol
   | bigint;
 
+export type RelationType =
+  | "oneToMany"
+  | "manyToMany"
+  | "oneToOne"
+  | "manyToOne";
+
+export type RelationNode = {
+  relationName: string;
+  relatedTable: string;
+  type: RelationType;
+  isArray: boolean;
+  foreignKey?: string;
+  localKey?: string;
+  joinTable?: string;
+  joinLocalKey?: string;
+  relatedKey?: string;
+  joinRelatedKey?: string;
+};
+
+export type PathResolution = {
+  nodes: RelationNode[];
+  jsonPath?: string;
+  relationPath: string; // The joined relation path
+};
+
 export type IsTraversable<T> = NonNullable<T> extends Primitive ? false : true;
 
 type Prev = [never, 0, 1, 2, 3, 4, 5];
@@ -196,24 +221,8 @@ export type DeleteQuery<T> = {
   filter: FilterQuery<T>;
 };
 
-// --- FACTORY HELPERS ---
-
-export function defineFilter<T>(filter: FilterQuery<T>): FilterQuery<T> {
-  return filter;
-}
-
-export function defineQuery<T>(query: SearchQuery<T>): SearchQuery<T> {
-  return query;
-}
-
-export function defineUpdateSet<T>(set: UpdateSet<T>): UpdateSet<T> {
-  return set;
-}
-
-export function defineProjection<T>(p: ValidPath<T>[]): ValidPath<T>[] {
-  return p;
-}
-
-export function defineInsertValue<T>(data: T): T {
-  return data;
-}
+export type QueryPaths = {
+  ctePaths: Set<string>;
+  outerPaths: Set<string>;
+  needsGroupBy: boolean;
+};

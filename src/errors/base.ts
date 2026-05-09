@@ -1,4 +1,4 @@
-import type { CastorErrorCode } from "./codes";
+import type { CastorErrorCode } from "../types";
 
 export class CastorError extends Error {
   public readonly code: CastorErrorCode;

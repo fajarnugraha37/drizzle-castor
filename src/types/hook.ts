@@ -3,8 +3,8 @@ import type { InferEntity, FindTable, InferModel } from "./helper";
 import type { FilterQuery } from "./query";
 import type { AnyDatabase, AnyTable } from "./schema-metadata";
 import type { InferInsert, SoftDeleteConfig, DbAction } from "./value";
-import type { Middleware } from "../middleware/index";
 import type { ExecutionContext } from "./context";
+import type { Middleware } from "./middleware";
 
 // --- HOOKS CONFIGURATION ---
 export type TableHooks<

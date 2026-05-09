@@ -1,5 +1,5 @@
+import type { CastorErrorCode } from "../types";
 import { CastorError } from "./base";
-import type { CastorErrorCode } from "./codes";
 
 export class QueryParsingError extends CastorError {
   constructor(message: string, code: CastorErrorCode = "QUERY_PARSING_ERROR", details?: any) {

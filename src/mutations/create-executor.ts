@@ -1,13 +1,13 @@
 import { supportsReturning } from "../helper/dialect-helper";
 import { buildSearchQueries, hydrateResults } from "../query-parser";
 import { MutationError } from "../errors";
-import type { MiddlewareContext } from "../middleware/index";
+import type { ExecutionContext } from "../types/context";
 
 /**
  * Executes a single record creation (One) with dialect-aware re-hydration.
  */
 export async function executeCreateOneMutation(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
   pkName: string,
   data: any
@@ -50,7 +50,7 @@ export async function executeCreateOneMutation(
  * Executes multiple record creation (Many) with dialect-aware re-hydration.
  */
 export async function executeCreateManyMutation(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
   pkName: string,
   data: any[]

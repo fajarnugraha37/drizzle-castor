@@ -1,10 +1,11 @@
 import { getPrimaryKeyColumnName } from "../helper";
 import { executeCreateOneMutation, executeCreateManyMutation } from "./create-executor";
-import type { MiddlewareContext } from "../middleware/index";
+import type { ExecutionContext } from "../types/context";
+import type { AnyTable } from "../types";
 
 export async function executeCreateOne(
-  ctx: MiddlewareContext,
-  baseTable: any,
+  ctx: ExecutionContext<any, any>,
+  baseTable: AnyTable,
 ) {
   const { params } = ctx;
   const pkName = getPrimaryKeyColumnName(baseTable);
@@ -18,7 +19,7 @@ export async function executeCreateOne(
 }
 
 export async function executeCreateMany(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
 ) {
   const { params } = ctx;

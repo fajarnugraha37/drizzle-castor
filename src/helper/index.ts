@@ -5,3 +5,4 @@ export * from "./dialect-helper";
 export * from "./soft-delete-helper";
 export * from "./mutation-helper";
 export * from "./table-helper";
+export * from "./type-helper";

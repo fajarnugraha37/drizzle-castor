@@ -2,10 +2,10 @@ import { getPrimaryKeyColumnName } from "../helper";
 import { executeBatchMutation } from "./batch-executor";
 import { executeSingleMutation } from "./single-executor";
 import { supportsReturning } from "../helper/dialect-helper";
-import type { MiddlewareContext } from "../middleware/index";
+import type { ExecutionContext } from "../types/context";
 
 export async function executeHardDeleteOne(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
 ): Promise<boolean> {
   const { params } = ctx;
@@ -44,7 +44,7 @@ export async function executeHardDeleteOne(
 }
 
 export async function executeHardDeleteMany(
-  ctx: MiddlewareContext,
+  ctx: ExecutionContext<any, any>,
   baseTable: any,
 ): Promise<number> {
   const { params } = ctx;

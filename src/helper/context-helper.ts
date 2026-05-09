@@ -1,6 +1,5 @@
 import { useExecutionContext, updateContextMetadata } from "../context/manager";
-import type { ExecutionContext } from "../context/execution-context";
-import type { AnyDatabase, AnyTable } from "../types";
+import type { AnyDatabase, AnyTable, ExecutionContext } from "../types";
 
 /**
  * Shorthand to get the current ExecutionContext.
@@ -51,7 +50,7 @@ export function getState<T = any, TState extends Record<string, any> = any>(
 export function getSchemaConfig<T = any>(): T {
   const ctx = useExecutionContext();
   const tableName = ctx.tableName;
-  return ctx.schemaMetadata[tableName] as T;
+  return ctx.translatorContext.metadata[tableName] as T;
 }
 
 export const defaultTraceIdGenerator = (): string => {

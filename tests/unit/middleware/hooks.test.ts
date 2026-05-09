@@ -10,7 +10,7 @@ describe("Hooks Middleware", () => {
     id: serial("id").primaryKey(),
   });
 
-  const createMockContext = (action: any, params: any, hooks?: any): MiddlewareContext => ({
+  const createMockContext = (action: any, params: any, hooks?: any): ExecutionContext<any, any> => ({
     action,
     tableName: "users",
     profile: "default",
@@ -26,7 +26,7 @@ describe("Hooks Middleware", () => {
     state: {}
   });
 
-  const runWithContext = async (action: any, params: any, hooks: any, fn: (ctx: MiddlewareContext) => Promise<any>) => {
+  const runWithContext = async (action: any, params: any, hooks: any, fn: (ctx: ExecutionContext<any, any>) => Promise<any>) => {
     const ctx = createMockContext(action, params, hooks);
     return runInContext({
         action,
@@ -37,7 +37,7 @@ describe("Hooks Middleware", () => {
         db: {} as any,
         schemaMetadata: { users: { hooks } },
         translatorContext: ctx.translatorContext
-    }, () => fn(ctx));
+    }, async (executionCtx) => fn(executionCtx));
   };
 
   const middleware = createHooksMiddleware();

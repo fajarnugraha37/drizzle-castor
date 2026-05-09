@@ -3,8 +3,7 @@ export type InferInsert<TTable> = TTable extends { $inferInsert: infer U }
   ? U
   : never;
 
-
-  export type DbAction =
+export type DbAction =
   | "create"
   | "read"
   | "update"
@@ -12,8 +11,7 @@ export type InferInsert<TTable> = TTable extends { $inferInsert: infer U }
   | "restore"
   | "hardDelete";
 
-
-  export type ValueProvider<T> = T | (() => T) | (() => Promise<T>);
+export type ValueProvider<T> = T | (() => T) | (() => Promise<T>);
 
 export type SoftDeleteConfig<TBaseTable> = {
   deleteValue: Partial<{

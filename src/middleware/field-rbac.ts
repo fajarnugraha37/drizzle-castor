@@ -1,6 +1,5 @@
-import type { Middleware } from "./index";
 import { AccessDeniedError } from "../errors";
-import type { RepoProfileConfig } from "../types";
+import type { Middleware, RepoProfileConfig } from "../types";
 import { CONJUNCTION_OPERATORS } from "../types";
 
 function mergePermissions(profiles: string[], options: Record<string, RepoProfileConfig<any, any>>) {
