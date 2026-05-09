@@ -1,12 +1,12 @@
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware } from "./types";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig } from "./types";
 
 export class SchemaBuilder<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],
   TMetadata extends Record<string, any> = {},
 > {
-  private globalMiddlewares: Middleware[] = [];
+  private registeredMiddlewares: { middleware: Middleware, config?: MiddlewareConfig<TTables> }[] = [];
   private isThrowError: boolean = false;
   private traceIdGenerator?: TraceIdGenerator;
 
@@ -17,8 +17,8 @@ export class SchemaBuilder<
     private metadata: TMetadata = {} as TMetadata,
   ) {}
 
-  use(middleware: Middleware): this {
-    this.globalMiddlewares.push(middleware);
+  use(middleware: Middleware, config?: MiddlewareConfig<TTables>): this {
+    this.registeredMiddlewares.push({ middleware, config });
     return this;
   }
 
@@ -46,7 +46,7 @@ export class SchemaBuilder<
       this.mode,
       metadataWithNewTable as any,
     );
-    newBuilder.globalMiddlewares = [...this.globalMiddlewares];
+    newBuilder.registeredMiddlewares = [...this.registeredMiddlewares];
     newBuilder.isThrowError = this.isThrowError;
     newBuilder.traceIdGenerator = this.traceIdGenerator;
     return newBuilder;
@@ -58,7 +58,7 @@ export class SchemaBuilder<
       this.db,
       this.tables,
       this.mode,
-      this.globalMiddlewares,
+      this.registeredMiddlewares,
       this.isThrowError,
       this.traceIdGenerator
     )(finalMetadata);

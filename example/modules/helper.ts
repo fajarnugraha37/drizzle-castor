@@ -68,6 +68,16 @@ export const schemaMetadataBuilder = createSchemaBuilder(db, [
   groupsTable,
   userGroups,
 ] as const)
+  .use(async (ctx, next) => {
+    // Determine user-friendly action name for logging
+    const actionName = ctx.action.replace(/([A-Z])/g, ' $1').toLowerCase();
+    
+    console.log(`[Hooks] Before ${actionName} hook triggered`);
+    const result = await next();
+    console.log(`[Hooks] After ${actionName} hook triggered`);
+    
+    return result;
+  }, { tables: "users" })
   .table("users", {
     oneToOne: [
       {

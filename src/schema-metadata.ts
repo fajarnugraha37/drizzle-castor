@@ -5,8 +5,8 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
 import { findBaseTable } from "./helper";
-import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware } from "./types";
-import { composeMiddleware, createFieldRbacMiddleware, createHooksMiddleware, createRbacMiddleware } from "./middleware";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, TProfileOptions, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig } from "./types";
+import { composeMiddleware, createFieldRbacMiddleware, createRbacMiddleware } from "./middleware";
 import type { ExecutionContext } from "./types/context";
 import { runInContext, endExecutionContext, useExecutionContext } from "./context/manager";
 
@@ -17,7 +17,7 @@ export function defineSchemaMetadata<
   db: TDb, 
   tables: TTables, 
   mode: "strict" | "lenient" = "lenient",
-  globalMiddlewares: Middleware[] = [],
+  registeredMiddlewares: { middleware: Middleware, config?: MiddlewareConfig<TTables> }[] = [],
   isThrowError: boolean = false,
   traceIdGenerator?: TraceIdGenerator
 ) {
@@ -27,7 +27,6 @@ export function defineSchemaMetadata<
     );
   }
 
-  const hooksMiddleware = createHooksMiddleware();
   const tableRbacMiddleware = createRbacMiddleware(mode);
 
   return function <const TMetadata extends TSchemaMetadata<TDb, TTables>>(
@@ -60,17 +59,37 @@ export function defineSchemaMetadata<
         baseTableName: tableName,
         telemetrySubscribers,
       };
-
-      const tableConfig = (metadata as any)[tableName] || {};
-      const tableMiddlewares = tableConfig.middlewares || [];
       
       const fieldRbacMiddleware = createFieldRbacMiddleware(options as any, mode, isThrowError);
 
-      // Stack: Global -> Table Specific -> Hooks -> Table RBAC -> Field RBAC -> Core Action
+      const applicableMiddlewares: Middleware[] = [];
+
+      for (const { middleware, config } of registeredMiddlewares) {
+        // If config.tables is defined and doesn't include this table, skip it
+        if (config?.tables) {
+          const allowedTables = Array.isArray(config.tables) ? config.tables : [config.tables];
+          if (!allowedTables.includes(tableName)) {
+            continue;
+          }
+        }
+
+        // Wrap middleware to conditionally execute based on action
+        const wrappedMiddleware: Middleware = async (ctx, next) => {
+          if (config?.actions) {
+            const allowedActions = Array.isArray(config.actions) ? config.actions : [config.actions];
+            if (!allowedActions.includes(ctx.action)) {
+              return next();
+            }
+          }
+          return middleware(ctx, next);
+        };
+
+        applicableMiddlewares.push(wrappedMiddleware);
+      }
+
+      // Stack: Global & Table Middlewares -> Table RBAC -> Field RBAC -> Core Action
       const pipeline = composeMiddleware([
-        ...globalMiddlewares,
-        ...tableMiddlewares,
-        hooksMiddleware,
+        ...applicableMiddlewares,
         tableRbacMiddleware,
         fieldRbacMiddleware
       ]);
