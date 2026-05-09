@@ -60,6 +60,7 @@ export function buildFieldOperator(
       return lte(column, value);
     case "$isNull":
       return value ? isNull(column) : isNotNull(column);
+    case "$isNotNull":
     case "$notIsNull":
       return value ? isNotNull(column) : isNull(column);
     case "$in":

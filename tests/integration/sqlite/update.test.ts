@@ -22,6 +22,7 @@ describe("SQLite Integration - Update Operations", () => {
         email TEXT UNIQUE NOT NULL,
         age INTEGER,
         metadata TEXT,
+        settings TEXT,
         deleted_flag INTEGER DEFAULT 0,
         deleted_at TEXT
       )
@@ -76,13 +77,42 @@ describe("SQLite Integration - Update Operations", () => {
     expect(updated?.metadata.tags).toEqual(["new"]);
   });
 
-  test("updateOne - Individual JSON key update", async () => {
+  test("updateOne - modify json column (replace)", async () => {
     const userRepo = builder.repoFactory("users", {});
-    await userRepo.updateOne(2, { metadata: { theme: "initial", tags: ["old"] } }, "admin");
-    
-    const updated = await userRepo.updateOne(2, { "metadata.theme": "updated-key" }, "admin");
+    await userRepo.updateOne(1, { settings: { theme: "original" } }, "admin");
+    const updated = await userRepo.updateOne(1, { settings: { theme: "replaced" } }, "admin");
+    expect(updated?.settings.theme).toBe("replaced");
+  });
 
-    expect(updated?.metadata.theme).toBe("updated-key");
-    expect(updated?.metadata.tags).toEqual(["old"]);
+  test("updateOne - modify nested json key (level 2)", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    await userRepo.updateOne(2, { 
+      settings: { 
+        persona: { nickName: "Bob", avatarUrl: "old-url" } 
+      } 
+    }, "admin");
+    
+    const updated = await userRepo.updateOne(2, { 
+      "settings.persona.avatarUrl": "new-url" 
+    }, "admin");
+
+    expect(updated?.settings.persona.avatarUrl).toBe("new-url");
+    expect(updated?.settings.persona.nickName).toBe("Bob"); // Should be preserved
+  });
+
+  test("updateOne - modify nested json array (level 2)", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    await userRepo.updateOne(1, { 
+      settings: { 
+        persona: { hobbies: ["coding", "gaming"] } 
+      } 
+    }, "admin");
+    
+    // Modify hobbies[1] (gaming -> hiking)
+    const updated = await userRepo.updateOne(1, { 
+      "settings.persona.hobbies.1": "hiking" 
+    }, "admin");
+
+    expect(updated?.settings.persona.hobbies).toEqual(["coding", "hiking"]);
   });
 });

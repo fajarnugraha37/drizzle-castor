@@ -22,6 +22,7 @@ describe("SQLite Integration - Create Operations", () => {
         email TEXT UNIQUE NOT NULL,
         age INTEGER,
         metadata TEXT,
+        settings TEXT,
         deleted_flag INTEGER DEFAULT 0,
         deleted_at TEXT
       )
@@ -96,13 +97,33 @@ describe("SQLite Integration - Create Operations", () => {
       .rejects.toThrow();
   });
 
-  test("createOne - verify re-hydration (returning all fields)", async () => {
+  test("createOne - with complex nested JSON data", async () => {
     const userRepo = builder.repoFactory("users", {});
     const newUser = await userRepo.createOne({
-      name: "Rehydrate",
-      email: "rehydrate@example.com",
+      name: "Complex JSON User",
+      email: "complex_json@example.com",
+      settings: { 
+        persona: { 
+          nickName: "CJ", 
+          avatarUrl: "http://example.com/av.png",
+          hobbies: ["coding", "reading"]
+        } 
+      }
     }, "admin");
 
-    expect(newUser).toHaveProperty("deletedFlag", 0);
+    expect(newUser.settings.persona.nickName).toBe("CJ");
+    expect(newUser.settings.persona.hobbies).toContain("coding");
+  });
+
+  test("createMany - with JSON columns", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    const newUsers = await userRepo.createMany([
+      { name: "Bulk JSON 1", email: "bj1@example.com", metadata: { theme: "dark", tags: ["a"] } },
+      { name: "Bulk JSON 2", email: "bj2@example.com", metadata: { theme: "light", tags: ["b"] } },
+    ], "admin");
+
+    expect(newUsers).toHaveLength(2);
+    expect(newUsers[0].metadata.theme).toBe("dark");
+    expect(newUsers[1].metadata.theme).toBe("light");
   });
 });

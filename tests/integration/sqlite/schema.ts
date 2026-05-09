@@ -6,6 +6,14 @@ export const users = sqliteTable("users", {
   email: text("email").unique().notNull(),
   age: int("age"),
   metadata: text({ mode: "json" }).$type<{ theme: string; tags: string[] }>(),
+  settings: text({ mode: "json" }).$type<{ 
+    persona?: { 
+      nickName?: string; 
+      avatarUrl?: string;
+      hobbies?: string[];
+    };
+    theme?: string;
+  }>(),
   deletedFlag: int("deleted_flag").default(0),
   deletedAt: text("deleted_at"),
 });

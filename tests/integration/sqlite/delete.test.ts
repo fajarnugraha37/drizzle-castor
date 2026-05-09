@@ -22,6 +22,7 @@ describe("SQLite Integration - Delete & Restore Operations", () => {
         email TEXT UNIQUE NOT NULL,
         age INTEGER,
         metadata TEXT,
+        settings TEXT,
         deleted_flag INTEGER DEFAULT 0,
         deleted_at TEXT
       )

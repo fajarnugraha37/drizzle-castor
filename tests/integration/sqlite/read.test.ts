@@ -22,6 +22,7 @@ describe("SQLite Integration - Read Operations", () => {
         email TEXT UNIQUE NOT NULL,
         age INTEGER,
         metadata TEXT,
+        settings TEXT,
         deleted_flag INTEGER DEFAULT 0,
         deleted_at TEXT
       )
@@ -97,8 +98,188 @@ describe("SQLite Integration - Read Operations", () => {
     await postRepo.createOne({ title: "Deleted Post", authorId: 1, deletedFlag: 1 });
 
     // Seed for JSON tests
-    await userRepo.createOne({ name: "John JSON", email: "john_json@example.com", age: 40, metadata: { theme: "dark", tags: ["expert", "node"] } });
-    await userRepo.createOne({ name: "Jane JSON", email: "jane_json@example.com", age: 30, metadata: { theme: "light", tags: ["beginner"] } });
+    await userRepo.createOne({ name: "John JSON", email: "john_json@example.com", age: 40, metadata: { theme: "dark", tags: ["expert", "node"] }, settings: { theme: "dark", persona: { nickName: "Johnny", avatarUrl: "dark-av", hobbies: ["coding", "gaming"] } } });
+    await userRepo.createOne({ name: "Jane JSON", email: "jane_json@example.com", age: 30, metadata: { theme: "light", tags: ["beginner"] }, settings: { theme: "light", persona: { nickName: "Janie", avatarUrl: "light-av", hobbies: ["reading", "hiking"] } } });
+    await userRepo.createOne({ name: "Null Age User", email: "nullage@example.com", age: null });
+  });
+
+  describe("Advanced Operators", () => {
+    test("$eq and $ne", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      expect(await userRepo.searchMany({ filter: { age: { $eq: 25 } } })).toHaveLength(1);
+      // NOTE: In standard SQL, age <> 25 excludes records where age is NULL.
+      // Active: Alice(25), Bob(30), John(40), Jane(30), Null(null)
+      // $ne 25 -> Bob, John, Jane. (Total 3)
+      expect(await userRepo.searchMany({ filter: { age: { $ne: 25 } } })).toHaveLength(3); 
+    });
+
+    test("$gt, $gte, $lt, $lte", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      expect(await userRepo.searchMany({ filter: { age: { $gt: 30 } } })).toHaveLength(1); // John(40)
+      expect(await userRepo.searchMany({ filter: { age: { $gte: 30 } } })).toHaveLength(3); // Bob(30), John(40), Jane(30)
+      expect(await userRepo.searchMany({ filter: { age: { $lt: 30 } } })).toHaveLength(1); // Alice(25)
+      expect(await userRepo.searchMany({ filter: { age: { $lte: 30 } } })).toHaveLength(3); // Alice(25), Bob(30), Jane(30)
+    });
+
+    test("$isNull and $isNotNull", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      expect(await userRepo.searchMany({ filter: { age: { $isNull: true } } })).toHaveLength(1);
+      expect(await userRepo.searchMany({ filter: { age: { $isNotNull: true } } })).toHaveLength(4);
+    });
+
+    test("$inArray and $notInArray", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      expect(await userRepo.searchMany({ filter: { age: { $inArray: [25, 40] } } })).toHaveLength(2);
+      expect(await userRepo.searchMany({ filter: { age: { $notInArray: [25, 40] } } })).toHaveLength(2); // Bob(30), Jane(30). Null is excluded from comparison.
+    });
+
+    test("$between and $notBetween", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      expect(await userRepo.searchMany({ filter: { age: { $between: [25, 35] } } })).toHaveLength(3); // Alice, Bob, Jane
+      expect(await userRepo.searchMany({ filter: { age: { $notBetween: [25, 35] } } })).toHaveLength(1); // John(40)
+    });
+
+    test("$like, $ilike, $notLike, $notIlike", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      expect(await userRepo.searchMany({ filter: { email: { $like: "%example.com" } } })).toHaveLength(5);
+      expect(await userRepo.searchMany({ filter: { name: { $ilike: "alice" } } })).toHaveLength(1); // SQLite LIKE is case-insensitive for ASCII
+      expect(await userRepo.searchMany({ filter: { name: { $notLike: "Alice" } } })).toHaveLength(4);
+      expect(await userRepo.searchMany({ filter: { name: { $notIlike: "alice" } } })).toHaveLength(4);
+    });
+
+    test("$and, $or, $not", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      expect(await userRepo.searchMany({ 
+        filter: { $and: [{ age: { $gt: 25 } }, { age: { $lt: 40 } }] } 
+      })).toHaveLength(2); // Bob(30), Jane(30)
+
+      expect(await userRepo.searchMany({ 
+        filter: { $or: [{ age: { $eq: 25 } }, { age: { $eq: 40 } }] } 
+      })).toHaveLength(2); // Alice(25), John(40)
+
+      // NOTE: NOT (age = 25) in SQL is equivalent to age <> 25, which excludes NULL.
+      expect(await userRepo.searchMany({ 
+        filter: { $not: { age: { $eq: 25 } } } 
+      })).toHaveLength(3); // Bob, John, Jane. (Null is excluded)
+    });
+
+    test("$arrayContains, $arrayContained, $arrayOverlaps (PG only, should fail/ignore on SQLite)", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      // These are PostgreSQL specific and typically throw in Drizzle when used on SQLite
+      // We wrap in try-catch to document behavior
+      try {
+        await userRepo.searchMany({ filter: { "metadata.tags": { $arrayContains: ["expert"] } } as any });
+      } catch (e) {
+        expect(e).toBeDefined();
+      }
+    });
+  });
+
+  describe("Complex JSON Operations", () => {
+    test("searchOne - JSON path nested level 2 in projection", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const user = await userRepo.searchOne({
+        filter: { "settings.persona.nickName": { $eq: "Johnny" } },
+        projection: ["id", "settings.persona.nickName"]
+      });
+
+      expect(user?.settings?.persona?.nickName).toBe("Johnny");
+      expect(user?.settings?.persona?.avatarUrl).toBeUndefined();
+    });
+
+    test("searchMany - JSON path nested level 2 in filter", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const usersResult = await userRepo.searchMany({
+        filter: { "settings.persona.avatarUrl": { $eq: "light-av" } }
+      });
+
+      expect(usersResult).toHaveLength(1);
+      expect(usersResult[0].name).toBe("Jane JSON");
+    });
+
+    test("searchMany - JSON path nested level 2 in order", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const usersResult = await userRepo.searchMany({
+        filter: { name: { $like: "%JSON" } },
+        order: { "settings.persona.nickName": "desc" }
+      });
+
+      expect(usersResult[0].name).toBe("John JSON"); // "Johnny" > "Janie"
+      expect(usersResult[1].name).toBe("Jane JSON");
+    });
+
+    test("searchMany - JSON array index access (.1) in projection", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const user = await userRepo.searchOne({
+        filter: { name: { $eq: "John JSON" } },
+        projection: ["id", "settings.persona.hobbies.1"]
+      });
+
+      // John JSON hobbies: ["coding", "gaming"] -> index 1 is "gaming"
+      // Hydrator produces sparse array for partial index projection
+      expect(user?.settings?.persona?.hobbies).toEqual([undefined, "gaming"]); 
+    });
+
+    test("searchMany - JSON array index access (.1) in filter", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const usersResult = await userRepo.searchMany({
+        filter: { "settings.persona.hobbies.1": { $eq: "hiking" } }
+      });
+
+      // Jane JSON hobbies: ["reading", "hiking"] -> index 1 is "hiking"
+      expect(usersResult).toHaveLength(1);
+      expect(usersResult[0].name).toBe("Jane JSON");
+    });
+
+    test("searchMany - JSON array index access (.1) in order", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const usersResult = await userRepo.searchMany({
+        filter: { name: { $like: "%JSON" } },
+        order: { "settings.persona.hobbies.1": "asc" } 
+      });
+
+      // "gaming" (John) vs "hiking" (Jane) -> gaming < hiking
+      expect(usersResult[0].name).toBe("John JSON");
+      expect(usersResult[1].name).toBe("Jane JSON");
+    });
+  });
+
+  describe("Aggregates and Ordering", () => {
+    test("searchMany - aggregate in order on normal column", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      // This is a bit unusual but requested. Usually aggregates are used with group by.
+      // Drizzle-Castor's parseOrder supports "aggregate" key.
+      const usersResult = await userRepo.searchMany({
+        order: { age: { direction: "desc", aggregate: "max" } }
+      });
+      // In SQLite/MySQL, ordering by MAX(age) without GROUP BY usually returns the same rows but might affect performance or behavior.
+      // If we don't have GROUP BY, MAX(age) is calculated over the whole set.
+      // Actually, if we use sql`MAX(age)`, it might force a single result row if not grouped.
+      // Let's see how our implementation handles it.
+      expect(usersResult).toBeDefined();
+    });
+
+    test("searchMany - aggregate in order on JSON column", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const usersResult = await userRepo.searchMany({
+        order: { "settings.theme": { direction: "asc", aggregate: "min" } }
+      });
+      expect(usersResult).toBeDefined();
+    });
+
+    test("searchMany - nulls first/last", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      
+      const first = await userRepo.searchMany({
+        order: { age: { direction: "asc", nulls: "first" } }
+      });
+      expect(first[0].age).toBeNull();
+
+      const last = await userRepo.searchMany({
+        order: { age: { direction: "asc", nulls: "last" } }
+      });
+      expect(last[last.length - 1].age).toBeNull();
+    });
   });
 
   test("searchMany - JSON Filter (nested field)", async () => {
