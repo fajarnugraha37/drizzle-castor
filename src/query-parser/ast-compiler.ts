@@ -4,6 +4,7 @@ import type { AliasMap } from "./alias-manager";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
 import { buildJsonExtractionSql } from "./json-resolver";
+import { getPrimaryKeyColumnName } from "../helper";
 import type { AnyDatabase } from "../types";
 import { AliasNotFoundError, QueryParsingError, SecurityError, TableNotFoundError } from "../errors";
 
@@ -30,10 +31,13 @@ export function buildSelection(
   }
 
   const selection: any = {};
+  
+  // FIX MEDIUM: Use dynamic primary key detection instead of hardcoded 'id'
+  const pkName = getPrimaryKeyColumnName(baseTable);
 
-  // Always select the base table ID for hydration logic
+  // Always select the base table PK for hydration logic
   selection[baseTableName] = {
-    id: (baseTable as any).id,
+    [pkName]: (baseTable as any)[pkName],
   };
 
   for (const path of projection) {
@@ -49,8 +53,12 @@ export function buildSelection(
 
       if (!selection[aliasName]) {
         selection[aliasName] = {};
-        if (targetTable && targetTable.id) {
-          selection[aliasName]["id"] = targetTable.id; // Always include relation ID for hydration
+        if (targetTable) {
+           const relTableObj = resolution.nodes[resolution.nodes.length - 1]?.relatedTable;
+           const relPkName = relTableObj ? getPrimaryKeyColumnName(metadata[relTableObj]?.table || targetTable) : "id";
+           if (targetTable[relPkName]) {
+             selection[aliasName][relPkName] = targetTable[relPkName]; // Always include relation PK for hydration
+           }
         }
       }
     } else {

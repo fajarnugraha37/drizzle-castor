@@ -106,10 +106,12 @@ export function hydrateResults(
     for (const [alias, rawData] of Object.entries(row)) {
       if (alias === baseTableName || alias === "sq" || !rawData) continue;
 
-      // Resolve the path and its corresponding table columns
+      // FIX MEDIUM: Strict alias resolution to avoid underscore collisions
       let path = aliasToPath.get(alias);
       if (!path) {
-        path = alias.startsWith("rel_") ? alias.substring(4).replace(/_/g, ".") : alias;
+         // If it's not in our explicit path map, it might be a custom selection.
+         // We ignore it to prevent incorrect hydration logic (Case: underscores in table names).
+         continue;
       }
 
       let relTableColumns: Record<string, any> | undefined;

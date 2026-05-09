@@ -25,6 +25,7 @@ import {
 } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 import { getDialect } from "../helper";
+import { QueryParsingError } from "../errors";
 
 /**
  * Maps a single NoSQL-like operator to a Drizzle SQL condition.
@@ -95,7 +96,11 @@ export function buildFieldOperator(
     case "$arrayOverlaps":
       return Array.isArray(value) ? arrayOverlaps(column, value) : undefined;
     default:
-      return undefined; // Ignore unknown operators
+      // FIX LOW: Throw error for unknown $ operators to help users debug typos.
+      if (operator.startsWith("$")) {
+        throw new QueryParsingError(`Unknown operator: ${operator}`);
+      }
+      return undefined;
   }
 }
 
