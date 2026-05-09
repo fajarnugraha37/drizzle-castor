@@ -167,10 +167,12 @@ export function createFieldRbacMiddleware(
           if (!merged.allowedProjections || merged.allowedProjections.size === 0) {
              throw new AccessDeniedError(`[Access Denied] No projections allowed.`);
           }
-          q.projection = Array.from(merged.allowedProjections);
+          q.projection = Array.from(merged.allowedProjections || []);
         }
       } else {
         const allowed = handleFields(q.projection, merged.allowedProjections, isThrowError, "projection");
+        // BUG FIX: If projection is empty after trimming, it means the user has NO PERMISSION to see any data.
+        // We MUST throw an error here, regardless of mode, because otherwise ast-compiler would select *
         if (!allowed && q.projection.length > 0) {
           throw new AccessDeniedError(`[Access Denied] All requested projection fields were denied.`);
         }

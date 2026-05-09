@@ -5,11 +5,12 @@ import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
 import { buildJsonExtractionSql } from "./json-resolver";
 import type { AnyDatabase } from "../types";
-import { AliasNotFoundError, SecurityError, TableNotFoundError } from "../errors";
+import { AliasNotFoundError, QueryParsingError, SecurityError, TableNotFoundError } from "../errors";
 
 /**
  * Builds a specific selection object for Drizzle to only select requested columns.
- * Returns undefined if projection is empty (defaulting to select all).
+ * Returns undefined if projection is undefined (defaulting to select all).
+ * Throws QueryParsingError if projection is explicitly empty [].
  */
 export function buildSelection(
   projection: string[] | undefined,
@@ -19,7 +20,14 @@ export function buildSelection(
   metadata: any,
   db: any,
 ): any {
-  if (!projection || projection.length === 0) return undefined;
+  // If projection is explicitly truly undefined, Drizzle defaults to all columns.
+  if (projection === undefined) return undefined;
+
+  // BUG-1 HARDENING: If projection is explicitly provided but empty, throw error
+  // to prevent accidental "select all" leaks.
+  if (projection.length === 0) {
+    throw new QueryParsingError("Projection cannot be empty. Use undefined for all fields or specify at least one field.");
+  }
 
   const selection: any = {};
 
@@ -115,10 +123,10 @@ export function applyJoins(
         const origDelete = metadata[lastNode.relatedTable]?.softDelete?.deleteValue;
         for (const [k, v] of Object.entries(sdConfig.delete)) {
           const col = (aliased as any)[k];
-          if (origDelete && typeof origDelete[k] === "function") {
+          if (origDelete && typeof v === "function") {
             conditions.push(isNull(col));
           } else {
-            conditions.push(or(ne(col, v), isNull(col)) as SQL);
+            conditions.push(or(ne(col, v as any), isNull(col)) as SQL);
           }
         }
 
@@ -156,8 +164,7 @@ export function applyJoins(
                 const bOrigDelete = metadata[joinTableName]?.softDelete?.deleteValue;
                 for (const [k, v] of Object.entries(bridgeSdConfig.delete)) {
                   const bCol = (joinTableAlias as any)[k];
-                  // Handle dynamic vs static markers consistently
-                  if (bOrigDelete && typeof bOrigDelete[k] === "function") {
+                  if (bOrigDelete && typeof v === "function") {
                     bConditions.push(isNull(bCol));
                   } else {
                     bConditions.push(or(ne(bCol, v as any), isNull(bCol)) as SQL);
