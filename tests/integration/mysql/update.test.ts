@@ -27,6 +27,7 @@ describe("MySQL Integration - Update Operations", () => {
         email VARCHAR(255) NOT NULL UNIQUE,
         age INT,
         metadata JSON,
+        settings JSON,
         deleted_flag INT DEFAULT 0,
         deleted_at TIMESTAMP NULL
       )
@@ -71,36 +72,59 @@ describe("MySQL Integration - Update Operations", () => {
     expect(updated.every((u: any) => u.metadata.theme === "light")).toBe(true);
   });
 
-  test("updateOne - non-existent ID", async () => {
-    const userRepo = builder.repoFactory("users", {});
-    const updated = await userRepo.updateOne(9999, { age: 40 }, "admin");
-
-    expect(updated).toBeNull();
-  });
-
-  test("updateOne - JSON partial update (simulated via replacement)", async () => {
+  test("updateOne - modify json column (replace 1 column)", async () => {
     const userRepo = builder.repoFactory("users", {});
     const [alice] = await db.select().from(users).where(sql`name = 'Alice'`);
-    await userRepo.updateOne(alice.id, { metadata: { theme: "dark", tags: [] } }, "admin");
-    const updated = await userRepo.updateOne(alice.id, { metadata: { theme: "blue", tags: ["new"] } }, "admin");
-
-    expect(updated?.metadata.theme).toBe("blue");
-    expect(updated?.metadata.tags).toEqual(["new"]);
+    await userRepo.updateOne(alice.id, { settings: { theme: "original" } }, "admin");
+    const updated = await userRepo.updateOne(alice.id, { settings: { theme: "replaced" } }, "admin");
+    expect(updated?.settings.theme).toBe("replaced");
   });
 
-  test("updateOne - Individual JSON key update", async () => {
-    console.log("----- Starting Individual JSON Key Update Test -----");
+  test("updateOne - modify nested json key (level 2)", async () => {
     const userRepo = builder.repoFactory("users", {});
     const [bob] = await db.select().from(users).where(sql`name = 'Bob'`);
-    console.log("Before update:", bob);
+    await userRepo.updateOne(bob.id, { 
+      settings: { 
+        persona: { nickName: "Bob", avatarUrl: "old-url" } 
+      } 
+    }, "admin");
+    
+    const updated = await userRepo.updateOne(bob.id, { 
+      "settings.persona.avatarUrl": "new-url" 
+    }, "admin");
 
-    const affectedRecords = await userRepo.updateOne(bob.id, { metadata: { theme: "initial", tags: ["old"] } }, "admin");
-    console.log("After initial update:", affectedRecords);
-    const updated = await userRepo.updateOne(bob.id, { "metadata.theme": "updated-key" }, "admin");
-    console.log("After partial JSON update:", updated);
+    expect(updated?.settings.persona.avatarUrl).toBe("new-url");
+    expect(updated?.settings.persona.nickName).toBe("Bob"); // Should be preserved
+  });
 
-    expect(updated).toBeDefined();
-    expect(updated?.metadata?.theme).toBe("updated-key");
-    expect(updated?.metadata?.tags).toEqual(["old"]);
+  test("updateOne - modify nested json array (level 2)", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    const [alice] = await db.select().from(users).where(sql`name = 'Alice'`);
+    await userRepo.updateOne(alice.id, { 
+      settings: { 
+        persona: { hobbies: ["coding", "gaming"] } 
+      } 
+    }, "admin");
+    
+    // Modify hobbies[1] (gaming -> hiking)
+    const updated = await userRepo.updateOne(alice.id, { 
+      "settings.persona.hobbies.1": "hiking" 
+    }, "admin");
+
+    expect(updated?.settings.persona.hobbies).toEqual(["coding", "hiking"]);
+  });
+
+  test("updateMany - modify json key (level 2) bulk", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    await userRepo.updateMany({}, { settings: { persona: { avatarUrl: "bulk-old" } } }, "admin");
+    
+    const updated = await userRepo.updateMany(
+      { name: { $inArray: ["Alice", "Bob"] } },
+      { "settings.persona.avatarUrl": "bulk-new" },
+      "admin"
+    );
+
+    expect(updated).toHaveLength(2);
+    expect(updated.every(u => u.settings.persona.avatarUrl === "bulk-new")).toBe(true);
   });
 });

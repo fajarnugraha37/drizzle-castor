@@ -1,11 +1,19 @@
-import { mysqlTable, serial, text, int, json, timestamp, primaryKey } from "drizzle-orm/mysql-core";
+import { mysqlTable, serial, text, int, json, timestamp, primaryKey, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  email: text("email").notNull(), // text in mysql doesn't support unique easily without length, but for tests it's fine if we don't add unique constraint in DB or use varchar
+  email: varchar("email", { length: 255 }).notNull(),
   age: int("age"),
   metadata: json("metadata").$type<{ theme: string; tags: string[] }>(),
+  settings: json("settings").$type<{ 
+    persona?: { 
+      nickName?: string; 
+      avatarUrl?: string;
+      hobbies?: string[];
+    };
+    theme?: string;
+  }>(),
   deletedFlag: int("deleted_flag").default(0),
   deletedAt: timestamp("deleted_at"),
 });

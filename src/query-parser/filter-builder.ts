@@ -3,7 +3,7 @@ import type { SQL } from "drizzle-orm";
 import { analyzeQuery } from "./analyzer";
 import { buildAliases } from "./alias-manager";
 import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compiler";
-import { getPrimaryKeyColumnName, resolveProviderValues } from "../helper";
+import { getDialect, getPrimaryKeyColumnName, resolveProviderValues } from "../helper";
 import type { SearchQuery, TranslatorContext } from "../types";
 import { TableNotFoundError } from "../errors";
 
@@ -240,14 +240,19 @@ export async function buildSearchQueries<T>(
   // This ensures the order is preserved after join without needing to re-evaluate aggregates 
   // or group by in the outer query, which is crucial for PostgreSQL.
   if (orderAst.length > 0) {
+    const dialect = getDialect(db);
     const outerOrderClauses = orderAst.map((o, i) => {
        const cteCol = (sq as any)[`__order_${i}`];
        const sortDir = o.direction === "desc" ? sql`DESC` : sql`ASC`;
        let nullsSql = sql``;
-       if (o.nulls === "first") {
-         nullsSql = sql` NULLS FIRST`;
-       } else if (o.nulls === "last") {
-         nullsSql = sql` NULLS LAST`;
+       
+       // MySQL doesn't support NULLS FIRST/LAST syntax.
+       if (dialect !== "mysql") {
+         if (o.nulls === "first") {
+           nullsSql = sql` NULLS FIRST`;
+         } else if (o.nulls === "last") {
+           nullsSql = sql` NULLS LAST`;
+         }
        }
        return sql`${cteCol} ${sortDir}${nullsSql}`;
     });

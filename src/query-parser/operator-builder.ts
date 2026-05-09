@@ -85,14 +85,19 @@ export function buildFieldOperator(
     case "$like":
       return like(column, value);
     case "$ilike":
-      // SQLite doesn't natively support ILIKE
-      return isSQLite ? like(column, value) : ilike(column, value);
+      // MySQL is case-insensitive by default for most collations, and doesn't support ILIKE keyword.
+      return isSQLite || dialect === "mysql" ? like(column, value) : ilike(column, value);
     case "$notLike":
       return notLike(column, value);
     case "$notIlike":
-      return isSQLite ? notLike(column, value) : notIlike(column, value);
+      return isSQLite || dialect === "mysql" ? notLike(column, value) : notIlike(column, value);
     case "$arrayContains":
       if (!Array.isArray(value)) return undefined;
+      const acDialect = getDialect(db);
+      if (acDialect === "mysql") {
+        // MySQL JSON_CONTAINS(column, target_json)
+        return sql`JSON_CONTAINS(${column}, ${JSON.stringify(value)})`;
+      }
       let acCol = column;
       let acVal: any = value;
       if (getDialect(db) === "pg" && (column as any).isJsonExtraction) {

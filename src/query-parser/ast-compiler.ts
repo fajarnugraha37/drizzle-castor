@@ -3,7 +3,7 @@ import { getColumn } from "./alias-manager";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
 import { buildJsonExtractionSql } from "./json-resolver";
-import { getPrimaryKeyColumnName } from "../helper";
+import { getDialect, getPrimaryKeyColumnName } from "../helper";
 import type { AliasMap, AnyDatabase } from "../types";
 import { AliasNotFoundError, QueryParsingError, SecurityError, TableNotFoundError } from "../errors";
 
@@ -300,12 +300,8 @@ export function parseOrder(
 
     const sortDir = dir === "desc" ? sql`DESC` : sql`ASC`;
     let nullsSql = sql``;
-    if (nullsPosition === "first") {
-      nullsSql = sql` NULLS FIRST`;
-    } else if (nullsPosition === "last") {
-      nullsSql = sql` NULLS LAST`;
-    }
-
+    const dialect = getDialect(db);
+    
     let expression: SQL;
     if (agg) {
       const aggFunc = agg.toUpperCase();
@@ -316,6 +312,29 @@ export function parseOrder(
       expression = sql`${sql.raw(aggFunc)}(${col})`;
     } else {
       expression = col;
+    }
+
+    if (dialect === "mysql" && nullsPosition) {
+      // MySQL simulation of NULLS FIRST/LAST:
+      // NULLS FIRST: ORDER BY column IS NOT NULL, column ASC
+      // NULLS LAST:  ORDER BY column IS NULL, column ASC
+      const isNullPart = nullsPosition === "first" 
+        ? sql`${expression} IS NOT NULL` 
+        : sql`${expression} IS NULL`;
+      
+      // We push two results: the null-handler and the actual column.
+      // Drizzle's orderBy takes multiple clauses.
+      results.push({
+        expression: isNullPart,
+        clause: isNullPart,
+        direction: "asc", // Always asc for the boolean check
+      });
+    } else if (dialect !== "mysql" && nullsPosition) {
+      if (nullsPosition === "first") {
+        nullsSql = sql` NULLS FIRST`;
+      } else if (nullsPosition === "last") {
+        nullsSql = sql` NULLS LAST`;
+      }
     }
 
     // Drizzle's asc/desc helpers return SQL chunks, but we build our own 

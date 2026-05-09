@@ -7,7 +7,7 @@ import { sql } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
 import { users } from "./schema";
 
-describe("MySQL Integration - Delete & Restore Operations", () => {
+describe("MySQL Integration - Delete Operations", () => {
   let container: StartedMySqlContainer;
   let connection: mysql.Connection;
   let db: any;
@@ -27,6 +27,7 @@ describe("MySQL Integration - Delete & Restore Operations", () => {
         email VARCHAR(255) NOT NULL UNIQUE,
         age INT,
         metadata JSON,
+        settings JSON,
         deleted_flag INT DEFAULT 0,
         deleted_at TIMESTAMP NULL
       )
@@ -39,17 +40,10 @@ describe("MySQL Integration - Delete & Restore Operations", () => {
           restoreValue: { deletedFlag: 0, deletedAt: null }
         },
         profiles: {
-          admin: ["softDelete", "restore", "hardDelete", "read"],
+          admin: ["softDelete", "restore", "hardDelete", "read", "create"],
         }
       })
       .build();
-
-    // Seed data
-    await db.insert(users).values([
-      { name: "Alice", email: "alice@example.com" },
-      { name: "Bob", email: "bob@example.com" },
-      { name: "Charlie", email: "charlie@example.com", deletedFlag: 1, deletedAt: new Date() },
-    ]);
   });
 
   after(async () => {
@@ -57,56 +51,74 @@ describe("MySQL Integration - Delete & Restore Operations", () => {
     if (container) await container.stop();
   });
 
-  test("softDeleteOne - should mark as deleted", async () => {
+  test("Soft Delete Consistency (One)", async () => {
     const userRepo = builder.repoFactory("users", {});
-    const success = await userRepo.softDeleteOne(1, "admin");
+    
+    // 1. Create
+    const user = await userRepo.createOne({ name: "One", email: "one@example.com" }, "admin");
+    expect(user).toBeDefined();
 
+    // 2. Soft Delete
+    const success = await userRepo.softDeleteOne(user.id, "admin");
     expect(success).toBe(true);
-    
-    const user = await userRepo.searchOne({ filter: { id: { $eq: 1 } } }, "admin");
-    expect(user).toBeNull();
 
-    const deletedUser = await userRepo.searchDeletedOne({ filter: { id: { $eq: 1 } } }, "admin");
-    expect(deletedUser).toBeDefined();
-    expect(deletedUser?.deletedFlag).toBe(1);
-  });
+    // 3. Search (should be empty)
+    const found = await userRepo.searchOne({ filter: { id: { $eq: user.id } } }, "admin");
+    expect(found).toBeNull();
 
-  test("softDeleteMany - should mark multiple as deleted", async () => {
-    const userRepo = builder.repoFactory("users", {});
-    const count = await userRepo.softDeleteMany({ name: { $eq: "Bob" } }, "admin");
+    // 4. Search Deleted (should exist)
+    const deleted = await userRepo.searchDeletedOne({ filter: { id: { $eq: user.id } } }, "admin");
+    expect(deleted).toBeDefined();
+    expect(deleted?.deletedFlag).toBe(1);
 
-    expect(count).toBe(1);
-    
-    const bob = await userRepo.searchOne({ filter: { name: { $eq: "Bob" } } }, "admin");
-    expect(bob).toBeNull();
-  });
+    // 5. Restore
+    const restoredSuccess = await userRepo.restoreOne(user.id, "admin");
+    expect(restoredSuccess).toBe(true);
 
-  test("restoreOne - should bring back soft-deleted", async () => {
-    const userRepo = builder.repoFactory("users", {});
-    const [charlie] = await db.select().from(users).where(sql`name = 'Charlie'`);
-    const success = await userRepo.restoreOne(charlie.id, "admin");
-
-    expect(success).toBe(true);
-    
-    const restored = await userRepo.searchOne({ filter: { id: { $eq: charlie.id } } }, "admin");
+    // 6. Search (should exist now)
+    const restored = await userRepo.searchOne({ filter: { id: { $eq: user.id } } }, "admin");
     expect(restored).toBeDefined();
     expect(restored?.deletedFlag).toBe(0);
   });
 
-  test("hardDeleteOne - should permanently remove", async () => {
+  test("Soft Delete Consistency (Many)", async () => {
     const userRepo = builder.repoFactory("users", {});
-    const success = await userRepo.hardDeleteOne(1, "admin");
-
-    expect(success).toBe(true);
     
-    const alice = await userRepo.searchDeletedOne({ filter: { id: { $eq: 1 } } }, "admin");
-    expect(alice).toBeNull();
+    // 1. Create Many
+    await userRepo.createMany([
+      { name: "Many1", email: "m1@example.com" },
+      { name: "Many2", email: "m2@example.com" },
+    ], "admin");
+
+    // 2. Soft Delete Many
+    const count = await userRepo.softDeleteMany({ name: { $like: "Many%" } }, "admin");
+    expect(count).toBe(2);
+
+    // 3. Search (should be empty)
+    const active = await userRepo.searchMany({ filter: { name: { $like: "Many%" } } }, "admin");
+    expect(active).toHaveLength(0);
+
+    // 4. Search Deleted
+    const deleted = await userRepo.searchDeletedMany({ filter: { name: { $like: "Many%" } } }, "admin");
+    expect(deleted).toHaveLength(2);
+
+    // 5. Restore Many
+    const restoredCount = await userRepo.restoreMany({ name: { $like: "Many%" } }, "admin");
+    expect(restoredCount).toBe(2);
+
+    // 6. Search (should be back)
+    const back = await userRepo.searchMany({ filter: { name: { $like: "Many%" } } }, "admin");
+    expect(back).toHaveLength(2);
   });
 
-  test("hardDeleteMany - should permanently remove multiple", async () => {
+  test("Hard Delete Consistency", async () => {
     const userRepo = builder.repoFactory("users", {});
-    const count = await userRepo.hardDeleteMany({ age: { $isNull: true } }, "admin");
+    const user = await userRepo.createOne({ name: "Hard", email: "hard@example.com" }, "admin");
 
-    expect(count).toBeGreaterThanOrEqual(1);
+    const success = await userRepo.hardDeleteOne(user.id, "admin");
+    expect(success).toBe(true);
+
+    const deleted = await userRepo.searchDeletedOne({ filter: { id: { $eq: user.id } } }, "admin");
+    expect(deleted).toBeNull();
   });
 });

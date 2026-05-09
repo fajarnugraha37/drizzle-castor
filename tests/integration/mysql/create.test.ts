@@ -5,7 +5,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { sql } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
-import { users, profiles, posts, categories, postsToCategories } from "./schema";
+import { users, profiles, posts } from "./schema";
 
 describe("MySQL Integration - Create Operations", () => {
   let container: StartedMySqlContainer;
@@ -27,6 +27,7 @@ describe("MySQL Integration - Create Operations", () => {
         email VARCHAR(255) NOT NULL UNIQUE,
         age INT,
         metadata JSON,
+        settings JSON,
         deleted_flag INT DEFAULT 0,
         deleted_at TIMESTAMP NULL
       )
@@ -86,6 +87,24 @@ describe("MySQL Integration - Create Operations", () => {
     expect(newUser.metadata).toEqual({ theme: "dark", tags: ["mysql", "json"] });
   });
 
+  test("createOne - with complex nested JSON data", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    const newUser = await userRepo.createOne({
+      name: "Complex JSON User",
+      email: "complex_json@example.com",
+      settings: { 
+        persona: { 
+          nickName: "CJ", 
+          avatarUrl: "http://example.com/av.png",
+          hobbies: ["coding", "reading"]
+        } 
+      }
+    }, "admin");
+
+    expect(newUser.settings.persona.nickName).toBe("CJ");
+    expect(newUser.settings.persona.hobbies).toContain("coding");
+  });
+
   test("createMany - bulk insert", async () => {
     const userRepo = builder.repoFactory("users", {});
     const newUsers = await userRepo.createMany([
@@ -97,6 +116,18 @@ describe("MySQL Integration - Create Operations", () => {
     expect(newUsers).toHaveLength(3);
     expect(newUsers[0].id).toBeDefined();
     expect(newUsers[2].id).toBe(newUsers[0].id + 2);
+  });
+
+  test("createMany - with JSON columns", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    const newUsers = await userRepo.createMany([
+      { name: "Bulk JSON 1", email: "bj1@example.com", metadata: { theme: "dark", tags: ["a"] } },
+      { name: "Bulk JSON 2", email: "bj2@example.com", metadata: { theme: "light", tags: ["b"] } },
+    ], "admin");
+
+    expect(newUsers).toHaveLength(2);
+    expect(newUsers[0].metadata.theme).toBe("dark");
+    expect(newUsers[1].metadata.theme).toBe("light");
   });
 
   test("createOne - duplicate email should throw", async () => {
