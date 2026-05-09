@@ -1,12 +1,12 @@
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import type { AnyMySqlTable } from "drizzle-orm/mysql-core";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
-import { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { LibSQLDatabase } from "drizzle-orm/libsql";
-import { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { MySql2Database } from "drizzle-orm/mysql2";
+import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import type { LibSQLDatabase } from "drizzle-orm/libsql";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { MySql2Database } from "drizzle-orm/mysql2";
 import type { AnyD1Database } from "drizzle-orm/d1";
 import type { TableConfig } from "./hook";
 import type { RepoProfileConfig } from "./repository";
