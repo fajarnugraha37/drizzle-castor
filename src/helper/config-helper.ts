@@ -1,5 +1,16 @@
 import { ConfigurationError } from "../errors";
-import type { SoftDeleteConfig } from "../types";
+import type { AnyDatabase, AnyTable, TTranslatorContext } from "../types";
+import type { SoftDeleteConfig, TableConfig } from "../types";
+
+export function getTableMetadataConfig<
+  TDb extends AnyDatabase,
+  TTables extends readonly AnyTable[]
+>(
+  translatorContext: TTranslatorContext<TDb, TTables>,
+  tableName: string,
+): TableConfig<any, any> | undefined {
+  return (translatorContext.metadata as any)?.[tableName];
+}
 
 export function getSoftDeleteConfig(
   metadata: any,

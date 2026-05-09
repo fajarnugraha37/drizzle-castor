@@ -1,5 +1,6 @@
 import { findBaseTable, getPrimaryKeyColumnName } from "../helper";
-import type { AnyDatabase, AnyTable, Middleware, TableHooks, TSchemaContext } from "../types";
+import { getTableMetadataConfig } from "../helper/config-helper";
+import type { AnyDatabase, AnyTable, TableHooks, TSchemaContext, Middleware } from "../types";
 
 export function createHooksMiddleware<
   T = any, 
@@ -9,14 +10,14 @@ export function createHooksMiddleware<
   THooks extends TableHooks<TSchema, string> = any,
 >(): Middleware<T, TDb, TTables> {
   return async (ctx, next) => {
-    const { action, tableName, params } = ctx;
-    const tables = ctx.translatorContext.tables;
-    const hooks = (ctx.translatorContext.metadata as any)[tableName]?.hooks as THooks | undefined;
+    const { action, tableName, params, translatorContext } = ctx;
+    const tables = translatorContext.tables;
+    const tableConfig = getTableMetadataConfig(translatorContext, tableName);
+    const hooks = tableConfig?.hooks as THooks | undefined;
 
     if (!hooks) {
       return next();
     }
-
     // Resolve PK name for filter construction
     const baseTable = findBaseTable(tables, tableName);
     const pkName = getPrimaryKeyColumnName(baseTable);
@@ -29,7 +30,8 @@ export function createHooksMiddleware<
         }
         break;
       case "read":
-        if (hooks.beforeSearch) await hooks.beforeSearch(params.query as any, ctx);
+        // Context holds generic SearchQuery<any>, but hooks expect strongly typed DbSearchQuery
+        if (hooks.beforeSearch && params.query) await hooks.beforeSearch(params.query as any, ctx);
         break;
       case "update":
         if (hooks.beforeUpdate) await hooks.beforeUpdate(params.set as any, params.id ? { [pkName]: { $eq: params.id } } : params.filter as any, ctx);

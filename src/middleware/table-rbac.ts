@@ -1,4 +1,5 @@
 import { AccessDeniedError } from "../errors";
+import { getTableMetadataConfig } from "../helper/config-helper";
 import type { DbAction, Middleware } from "../types";
 
 export function createRbacMiddleware(
@@ -6,7 +7,7 @@ export function createRbacMiddleware(
 ): Middleware {
   return async (ctx, next) => {
     const { action, tableName, profile, translatorContext } = ctx;
-    const tableConfig = (translatorContext.metadata as any)[tableName];
+    const tableConfig = getTableMetadataConfig(translatorContext, tableName);
 
     if (
       !tableConfig ||
