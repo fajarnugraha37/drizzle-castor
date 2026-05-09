@@ -29,6 +29,7 @@ describe("PostgreSQL Integration - Delete & Restore Operations", () => {
         email TEXT UNIQUE NOT NULL,
         age INTEGER,
         metadata JSONB,
+        settings JSONB,
         deleted_flag INTEGER DEFAULT 0,
         deleted_at TIMESTAMP
       );

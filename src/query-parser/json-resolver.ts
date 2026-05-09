@@ -43,23 +43,26 @@ export function buildJsonExtractionSql(
   validateJsonPath(jsonPath);
   
   const dialect = getDialect(db);
-
+  let result: SQL;
   if (dialect === "pg") {
     const pgPath = `{${jsonPath.replace(/\./g, ",")}}`;
     // FIX: Use #>> to extract as text instead of #> (jsonb). 
     // This allows standard operators like $eq ("value") to work without type mismatch errors.
-    return sql`${column}#>>${pgPath}`;
+    result = sql`${column}#>>${pgPath}`;
   } else if (dialect === "mysql") {
     const formattedPath = formatSqliteMysqlPath(jsonPath);
     const myPath = `$.${formattedPath}`;
     // FIX: Use ->> operator to return unquoted text. 
     // Prevents "value" (with quotes) failing comparison against value (without quotes).
-    return sql`${column}->>${myPath}`;
+    result = sql`${column}->>${myPath}`;
   } else {
     const formattedPath = formatSqliteMysqlPath(jsonPath);
     const litePath = `$.${formattedPath}`;
-    return sql`json_extract(${column}, ${litePath})`;
+    result = sql`json_extract(${column}, ${litePath})`;
   }
+
+  (result as any).isJsonExtraction = true;
+  return result;
 }
 
 /**

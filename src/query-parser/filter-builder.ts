@@ -152,8 +152,17 @@ export async function buildSearchQueries<T>(
     }
   }
 
+  const orderAst = parseOrder(query.order, baseTable, cteAliasMap, metadata, baseTableName, db);
+  
   // 3. Build CTE Query Builder
-  let cteQb = db.select({ [pkName]: pkColumn }).from(baseTable);
+  // We select the PK and all expressions used for ordering to ensure the outer query can reproduce the exact same order.
+  const cteSelection: Record<string, any> = { [pkName]: pkColumn };
+  orderAst.forEach((o, i) => {
+    // FIX: Must use .as() for raw SQL expressions in select to allow subquery referencing.
+    cteSelection[`__order_${i}`] = sql`${o.expression}`.as(`__order_${i}`);
+  });
+
+  let cteQb = db.select(cteSelection).from(baseTable);
   cteQb = applyJoins(
     cteQb,
     paths.ctePaths,
@@ -179,9 +188,8 @@ export async function buildSearchQueries<T>(
     cteQb = cteQb.groupBy(pkColumn);
   }
 
-  const orderAst = parseOrder(query.order, baseTable, cteAliasMap, metadata, baseTableName, db);
   if (orderAst.length > 0) {
-    cteQb = cteQb.orderBy(...orderAst);
+    cteQb = cteQb.orderBy(...orderAst.map((o) => o.clause));
   }
 
   if (isPaginated) {
@@ -227,6 +235,24 @@ export async function buildSearchQueries<T>(
     outerAliasMap,
     resolvedSoftDelete,
   );
+
+  // BUG-FIX: Explicitly apply ORDER BY to the main query using the values captured in the CTE.
+  // This ensures the order is preserved after join without needing to re-evaluate aggregates 
+  // or group by in the outer query, which is crucial for PostgreSQL.
+  if (orderAst.length > 0) {
+    const outerOrderClauses = orderAst.map((o, i) => {
+       const cteCol = (sq as any)[`__order_${i}`];
+       const sortDir = o.direction === "desc" ? sql`DESC` : sql`ASC`;
+       let nullsSql = sql``;
+       if (o.nulls === "first") {
+         nullsSql = sql` NULLS FIRST`;
+       } else if (o.nulls === "last") {
+         nullsSql = sql` NULLS LAST`;
+       }
+       return sql`${cteCol} ${sortDir}${nullsSql}`;
+    });
+    mainQb = mainQb.orderBy(...outerOrderClauses);
+  }
 
   return {
     cteQuery: cteQb,

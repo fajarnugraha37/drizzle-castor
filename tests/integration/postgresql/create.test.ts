@@ -30,6 +30,7 @@ describe("PostgreSQL Integration - Create Operations", () => {
         email TEXT UNIQUE NOT NULL,
         age INTEGER,
         metadata JSONB,
+        settings JSONB,
         deleted_flag INTEGER DEFAULT 0,
         deleted_at TIMESTAMP
       );
@@ -117,6 +118,24 @@ describe("PostgreSQL Integration - Create Operations", () => {
     });
   });
 
+  test("createOne - with complex nested JSON data", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    const newUser = await userRepo.createOne({
+      name: "Complex JSON User",
+      email: "complex_json@example.com",
+      settings: { 
+        persona: { 
+          nickName: "CJ", 
+          avatarUrl: "http://example.com/av.png",
+          hobbies: ["coding", "reading"]
+        } 
+      }
+    }, "admin");
+
+    expect(newUser.settings.persona.nickName).toBe("CJ");
+    expect(newUser.settings.persona.hobbies).toContain("coding");
+  });
+
   test("createMany - bulk insert", async () => {
     const userRepo = builder.repoFactory("users", {});
     const newUsers = await userRepo.createMany([
@@ -128,6 +147,18 @@ describe("PostgreSQL Integration - Create Operations", () => {
     expect(newUsers).toHaveLength(3);
     expect(newUsers.map(u => u.email)).toContain("user1@example.com");
     expect(newUsers.every(u => u.id !== undefined)).toBe(true);
+  });
+
+  test("createMany - with JSON columns", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    const newUsers = await userRepo.createMany([
+      { name: "Bulk JSON 1", email: "bj1@example.com", metadata: { theme: "dark", tags: ["a"] } },
+      { name: "Bulk JSON 2", email: "bj2@example.com", metadata: { theme: "light", tags: ["b"] } },
+    ], "admin");
+
+    expect(newUsers).toHaveLength(2);
+    expect(newUsers[0].metadata.theme).toBe("dark");
+    expect(newUsers[1].metadata.theme).toBe("light");
   });
 
   test("createOne - duplicate email should throw", async () => {

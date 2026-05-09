@@ -6,6 +6,14 @@ export const users = pgTable("users", {
   email: text("email").unique().notNull(),
   age: integer("age"),
   metadata: jsonb("metadata").$type<{ theme: string; tags: string[] }>(),
+  settings: jsonb("settings").$type<{ 
+    persona?: { 
+      nickName?: string; 
+      avatarUrl?: string;
+      hobbies?: string[];
+    };
+    theme?: string;
+  }>(),
   deletedFlag: integer("deleted_flag").default(0),
   deletedAt: timestamp("deleted_at"),
 });

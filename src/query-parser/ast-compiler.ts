@@ -1,4 +1,4 @@
-import { SQL, eq, asc, desc, sql, aliasedTable, getTableName, and, isNull, ne, or } from "drizzle-orm";
+import { SQL, eq, sql, aliasedTable, getTableName, and, isNull, ne, or } from "drizzle-orm";
 import { getColumn } from "./alias-manager";
 import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildFieldOperator, buildConjunction } from "./operator-builder";
@@ -257,7 +257,17 @@ export function parseFilter(
 }
 
 /**
- * Parses the OrderQuery object and returns an array of Drizzle Order clauses.
+ * Represents a parsed order clause with its expression and full SQL.
+ */
+export type ParsedOrder = {
+  expression: SQL;
+  clause: SQL;
+  direction: "asc" | "desc";
+  nulls?: "first" | "last";
+};
+
+/**
+ * Parses the OrderQuery object and returns an array of ParsedOrder objects.
  * Supports Smart Aggregation using sql`` for MAX/MIN.
  */
 export function parseOrder(
@@ -267,21 +277,21 @@ export function parseOrder(
   metadata: any,
   baseTableName: string,
   db: AnyDatabase,
-): SQL[] {
+): ParsedOrder[] {
   if (!order || typeof order !== "object") return [];
 
-  const clauses: SQL[] = [];
+  const results: ParsedOrder[] = [];
 
   for (const [key, config] of Object.entries(order)) {
     const col = getColumn(key, baseTable, aliasMap, metadata, baseTableName, db);
     if (!col) continue;
 
-    let dir = "asc";
+    let dir: "asc" | "desc" = "asc";
     let agg: string | undefined = undefined;
-    let nullsPosition: string | undefined = undefined;
+    let nullsPosition: "first" | "last" | undefined = undefined;
 
     if (typeof config === "string") {
-      dir = config;
+      dir = config as any;
     } else if (typeof config === "object" && config !== null) {
       dir = (config as any).direction || "asc";
       agg = (config as any).aggregate;
@@ -296,25 +306,29 @@ export function parseOrder(
       nullsSql = sql` NULLS LAST`;
     }
 
+    let expression: SQL;
     if (agg) {
-      // Smart Aggregation fallback: MIN for asc, MAX for desc if agg is specifically requested
       const aggFunc = agg.toUpperCase();
-      
-      // SECURITY FIX: Whitelist aggregation functions to prevent SQL injection via sql.raw()
       const allowedAggs = ["MAX", "MIN", "AVG", "SUM", "COUNT"];
       if (!allowedAggs.includes(aggFunc)) {
         throw new SecurityError(`Invalid aggregation function: ${aggFunc}`);
       }
-
-      // Use SQL template literal to force the aggregation function. 
-      // sql.raw is safe here because aggFunc is strictly whitelisted above.
-      clauses.push(sql`${sql.raw(aggFunc)}(${col}) ${sortDir}${nullsSql}`);
-    } else if (nullsPosition) {
-      clauses.push(sql`${col} ${sortDir}${nullsSql}`);
+      expression = sql`${sql.raw(aggFunc)}(${col})`;
     } else {
-      clauses.push(dir === "desc" ? desc(col) : asc(col));
+      expression = col;
     }
+
+    // Drizzle's asc/desc helpers return SQL chunks, but we build our own 
+    // to support complex NULLS FIRST/LAST and Aggregates consistently.
+    const clause = sql`${expression} ${sortDir}${nullsSql}`;
+    
+    results.push({ 
+      expression, 
+      clause, 
+      direction: dir, 
+      nulls: nullsPosition 
+    });
   }
 
-  return clauses;
+  return results;
 }

@@ -19,6 +19,7 @@ import {
   arrayContained,
   arrayOverlaps,
   SQL,
+  sql,
   and,
   or,
   not,
@@ -91,11 +92,32 @@ export function buildFieldOperator(
     case "$notIlike":
       return isSQLite ? notLike(column, value) : notIlike(column, value);
     case "$arrayContains":
-      return Array.isArray(value) ? arrayContains(column, value) : undefined;
+      if (!Array.isArray(value)) return undefined;
+      let acCol = column;
+      let acVal: any = value;
+      if (getDialect(db) === "pg" && (column as any).isJsonExtraction) {
+        acCol = sql`(${column as any})::jsonb` as any;
+        acVal = sql`${JSON.stringify(value)}::jsonb`;
+      }
+      return arrayContains(acCol as any, acVal);
     case "$arrayContained":
-      return Array.isArray(value) ? arrayContained(column, value) : undefined;
+      if (!Array.isArray(value)) return undefined;
+      let adCol = column;
+      let adVal: any = value;
+      if (getDialect(db) === "pg" && (column as any).isJsonExtraction) {
+        adCol = sql`(${column as any})::jsonb` as any;
+        adVal = sql`${JSON.stringify(value)}::jsonb`;
+      }
+      return arrayContained(adCol as any, adVal);
     case "$arrayOverlaps":
-      return Array.isArray(value) ? arrayOverlaps(column, value) : undefined;
+      if (!Array.isArray(value)) return undefined;
+      let aoCol = column;
+      let aoVal: any = value;
+      if (getDialect(db) === "pg" && (column as any).isJsonExtraction) {
+        aoCol = sql`(${column as any})::jsonb` as any;
+        aoVal = sql`${JSON.stringify(value)}::jsonb`;
+      }
+      return arrayOverlaps(aoCol as any, aoVal);
     default:
       // FIX LOW: Throw error for unknown $ operators to help users debug typos.
       if (operator.startsWith("$")) {
