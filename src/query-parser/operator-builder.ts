@@ -24,6 +24,7 @@ import {
   not,
 } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
+import { getDialect } from "../helper";
 
 /**
  * Maps a single NoSQL-like operator to a Drizzle SQL condition.
@@ -40,8 +41,8 @@ export function buildFieldOperator(
 ): SQL | undefined {
   if (value === undefined) return undefined;
 
-  const dialectName = db?.dialect?.constructor?.name || "";
-  const isSQLite = dialectName.toLowerCase().includes("sqlite");
+  const dialect = getDialect(db);
+  const isSQLite = dialect === "sqlite";
 
   switch (operator) {
     case "$eq":

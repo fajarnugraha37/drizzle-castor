@@ -11,6 +11,7 @@ import { Middleware } from "../dist";
 
 {
   const [, , command, subCommand, ...args] = process.argv;
+  console.log(`> Command: ${command}, Subcommand: ${subCommand}, Args: ${args.join(" ")}`);
   switch (command) {
     case "--seed":
       await seed(args);

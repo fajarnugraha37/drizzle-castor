@@ -23,3 +23,41 @@ export type SoftDeleteConfig<TBaseTable> = {
     [K in keyof TBaseTable]: ValueProvider<TBaseTable[K]>;
   }>;
 };
+
+/**
+ * CENTRALIZED RESERVED KEYWORDS (OPERATORS)
+ */
+export const CONJUNCTION_OPERATORS = ["$and", "$or", "$not"] as const;
+
+export const FIELD_OPERATORS = [
+  "$eq",
+  "$ne",
+  "$gt",
+  "$gte",
+  "$lt",
+  "$lte",
+  "$isNull",
+  "$notIsNull",
+  "$in",
+  "$notIn",
+  "$inArray",
+  "$notInArray",
+  "$between",
+  "$notBetween",
+  "$like",
+  "$ilike",
+  "$notLike",
+  "$notIlike",
+  "$arrayContains",
+  "$arrayContained",
+  "$arrayOverlaps",
+] as const;
+
+export const ALL_OPERATORS = [
+  ...CONJUNCTION_OPERATORS,
+  ...FIELD_OPERATORS,
+] as const;
+
+export type ConjunctionOperator = (typeof CONJUNCTION_OPERATORS)[number];
+export type FieldOperator = (typeof FIELD_OPERATORS)[number];
+export type ReservedOperator = (typeof ALL_OPERATORS)[number];

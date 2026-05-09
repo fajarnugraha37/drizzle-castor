@@ -41,3 +41,4 @@ db.sqlite-wal
 test-*.ts
 .bug-hunter/
 GEMINI.md
+.gemini/

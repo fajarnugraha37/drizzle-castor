@@ -5,7 +5,7 @@ import { executeSingleMutation } from "./single-executor";
 import { supportsReturning } from "../helper/dialect-helper";
 import type { MiddlewareContext } from "../middleware/index";
 
-export async function executeSoftDeleteOne(
+export async function executeRestoreOne(
   ctx: MiddlewareContext,
   baseTable: any,
 ): Promise<boolean> {
@@ -17,18 +17,18 @@ export async function executeSoftDeleteOne(
 
   if (!params.id) return false;
 
-  const setParams = await resolveProviderValues(config.deleteValue);
+  const setParams = await resolveProviderValues(config.restoreValue);
   const parsedSetParams = parseUpdateSetParser(db, baseTable, setParams);
 
-  // Search filter: only target records that are currently active
+  // Search filter: only target records that are currently deleted
   const searchFilter = await injectSoftDeleteFilter({
     filter: { [pkName]: { $eq: params.id } },
-  }, metadata, baseTableName, "active");
+  }, metadata, baseTableName, "deleted");
 
-  // Rehydrate filter: find the record that is now deleted
+  // Rehydrate filter: find the record that is now active
   const rehydrateFilter = await injectSoftDeleteFilter({
     filter: { [pkName]: { $eq: params.id } },
-  }, metadata, baseTableName, "deleted");
+  }, metadata, baseTableName, "active");
 
   const result = await executeSingleMutation(
     ctx,
@@ -58,7 +58,7 @@ export async function executeSoftDeleteOne(
   return false;
 }
 
-export async function executeSoftDeleteMany(
+export async function executeRestoreMany(
   ctx: MiddlewareContext,
   baseTable: any,
 ): Promise<number> {
@@ -68,11 +68,11 @@ export async function executeSoftDeleteMany(
   const pkName = getPrimaryKeyColumnName(baseTable);
   const pkColumn = baseTable[pkName];
 
-  const setParams = await resolveProviderValues(config.deleteValue);
+  const setParams = await resolveProviderValues(config.restoreValue);
   const parsedSetParams = parseUpdateSetParser(db, baseTable, setParams);
 
-  const searchFilter = await injectSoftDeleteFilter({ filter: params.filter }, metadata, baseTableName, "active");
-  const rehydrateFilter = await injectSoftDeleteFilter({ filter: params.filter }, metadata, baseTableName, "deleted");
+  const searchFilter = await injectSoftDeleteFilter({ filter: params.filter }, metadata, baseTableName, "deleted");
+  const rehydrateFilter = await injectSoftDeleteFilter({ filter: params.filter }, metadata, baseTableName, "active");
 
   const results = await executeBatchMutation(
     ctx,

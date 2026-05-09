@@ -1,7 +1,7 @@
 import { existsSync } from "fs";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { DefaultLogger, Logger } from "drizzle-orm";
-import { createSchemaBuilder } from "../../dist";
+import { createSchemaBuilder } from "../../src";
 import {
   commentsTable,
   companiesTable,

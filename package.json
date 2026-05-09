@@ -42,8 +42,8 @@
     "example:seed": "bun run example/index.ts --seed",
     "example:tsc": "bunx tsc example/index.ts --noEmit",
     "build": "rm -rf dist && bunx tsc && bunx tsup",
-    "test": "bun test",
-    "test:watch": "bun test --watch",
+    "test": "bun test --isolate",
+    "test:watch": "bun test --isolate --watch",
     "coverage:view": "open coverage/lcov-report/index.html",
     "action:validate": "act --action-offline-mode --workflows ./.github/workflows/validate.yml",
     "action:publish": "act --action-offline-mode --workflows ./.github/workflows/publish.yml --secret-file .secrets"

@@ -1,12 +1,36 @@
 import { expect, test, describe } from "bun:test";
 import { hydrateResults } from "../../../src/query-parser/hydrator";
 
+const COLUMNS = Symbol.for("drizzle:Columns");
+
 describe("Query Parser: Hydrator", () => {
   const mockMetadata = {
     users: {
+      table: {
+        [COLUMNS]: {
+          id: { dataType: "number" },
+          name: { dataType: "string" },
+          meta: { dataType: "json" },
+        },
+      },
       oneToMany: [{ relationName: "posts", relatedTable: "posts" }],
       oneToOne: [{ relationName: "profile", relatedTable: "profiles" }],
-    }
+    },
+    posts: {
+      table: {
+        [COLUMNS]: {
+          id: { dataType: "number" },
+          title: { dataType: "string" },
+        },
+      },
+    },
+    profiles: {
+      table: {
+        [COLUMNS]: {
+          age: { dataType: "number" },
+        },
+      },
+    },
   };
 
   test("Hydrates basic rows without relations", () => {
@@ -54,13 +78,29 @@ describe("Query Parser: Hydrator", () => {
     expect(res[0].settings).toEqual({ theme: "dark" });
   });
 
-  test("Safely handles JSON parsing of strings", () => {
+  test("Safely handles JSON parsing of strings using metadata", () => {
     const rows = [
-      { users: { id: 1, "meta": '{"a":1}' } },
+      { users: { id: 1, "meta": '{"a":1}', "name": '{"not": "json"}' } },
       { users: { id: 2, "meta": 'invalid_json' } }
     ];
     const res = hydrateResults(rows, "users", mockMetadata, "id", []);
+    
+    // Should parse 'meta' because it's marked as JSON in metadata
     expect(res[0].meta).toEqual({ a: 1 });
-    expect(res[1].meta).toEqual("invalid_json"); // keeps as string
+    
+    // Should NOT parse 'name' even if it looks like JSON, because it's marked as string
+    expect(res[0].name).toEqual('{"not": "json"}');
+    
+    expect(res[1].meta).toEqual("invalid_json"); // keeps as string if invalid
+  });
+
+  test("Parses JSON results from dot-notation keys (extractions)", () => {
+    const rows = [
+      { users: { id: 1, "persona.skills": '["js", "ts"]' } }
+    ];
+    const res = hydrateResults(rows, "users", mockMetadata, "id", []);
+    
+    // Should parse because key contains a dot (likely result of json_extract)
+    expect(res[0].persona.skills).toEqual(["js", "ts"]);
   });
 });

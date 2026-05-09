@@ -1,6 +1,6 @@
 import { SQL, sql, getTableColumns } from "drizzle-orm";
 import { getTableName } from "drizzle-orm";
-import { assertSafeKey } from "../helper";
+import { assertSafeKey, getDialect } from "../helper";
 import { ColumnNotFoundError, SecurityError } from "../errors";
 
 /**
@@ -42,12 +42,12 @@ export function buildJsonExtractionSql(
   // Security check for projection paths
   validateJsonPath(jsonPath);
   
-  const dialectName = (db as any).dialect?.constructor?.name || "";
+  const dialect = getDialect(db);
 
-  if (dialectName.startsWith("Pg")) {
+  if (dialect === "pg") {
     const pgPath = `{${jsonPath.replace(/\./g, ",")}}`;
     return sql`${column}#>${pgPath}`;
-  } else if (dialectName.startsWith("MySql")) {
+  } else if (dialect === "mysql") {
     const formattedPath = formatSqliteMysqlPath(jsonPath);
     const myPath = `$.${formattedPath}`;
     return sql`JSON_EXTRACT(${column}, ${myPath})`;
@@ -67,7 +67,7 @@ export function parseUpdateSet(
   baseTable: any,
   setParams: Record<string, any>
 ): Record<string, any> {
-  const dialectName = (db as any).dialect?.constructor?.name || "";
+  const dialect = getDialect(db);
   const parsedSet: Record<string, any> = {};
   const jsonMutations: Record<string, { path: string; value: any }[]> = Object.create(null);
   const tableColumns = getTableColumns(baseTable);
@@ -98,14 +98,14 @@ export function parseUpdateSet(
     const rawColumn = tableColumns[columnName];
     let mutationSql: SQL = rawColumn;
 
-    if (dialectName.startsWith("Pg")) {
+    if (dialect === "pg") {
       mutationSql = sql`COALESCE(${mutationSql}, '{}'::jsonb)`;
       for (const mut of mutations) {
         const pgPath = `{${mut.path.replace(/\./g, ",")}}`;
         const jsonVal = JSON.stringify(mut.value);
         mutationSql = sql`jsonb_set(${mutationSql}, ${pgPath}, ${jsonVal}::jsonb)`;
       }
-    } else if (dialectName.startsWith("MySql")) {
+    } else if (dialect === "mysql") {
       mutationSql = sql`COALESCE(${mutationSql}, JSON_OBJECT())`;
       const args = mutations.flatMap(mut => {
         const formattedPath = formatSqliteMysqlPath(mut.path);

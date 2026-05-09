@@ -147,7 +147,33 @@ export function applyJoins(
            const joinRelatedCol = (joinTableAlias as any)[joinRelatedColumnName];
 
            if (localCol && joinLocalCol && relatedCol && joinRelatedCol) {
-              currentQb = currentQb.leftJoin(joinTableAlias, eq(localCol, joinLocalCol));
+              // BUG-5 FIX: Apply soft-delete filters to the bridge table too
+              let bridgeSoftDeleteConditions: SQL | undefined = undefined;
+              const bridgeSdConfig = resolvedSoftDelete[joinTableName];
+              
+              if (bridgeSdConfig && bridgeSdConfig.delete) {
+                const bConditions: SQL[] = [];
+                const bOrigDelete = metadata[joinTableName]?.softDelete?.deleteValue;
+                for (const [k, v] of Object.entries(bridgeSdConfig.delete)) {
+                  const bCol = (joinTableAlias as any)[k];
+                  // Handle dynamic vs static markers consistently
+                  if (bOrigDelete && typeof bOrigDelete[k] === "function") {
+                    bConditions.push(isNull(bCol));
+                  } else {
+                    bConditions.push(or(ne(bCol, v as any), isNull(bCol)) as SQL);
+                  }
+                }
+                if (bConditions.length > 0) {
+                  bridgeSoftDeleteConditions = and(...bConditions);
+                }
+              }
+
+              const bridgeJoinCond = bridgeSoftDeleteConditions 
+                ? and(eq(localCol, joinLocalCol), bridgeSoftDeleteConditions) 
+                : eq(localCol, joinLocalCol);
+                
+              currentQb = currentQb.leftJoin(joinTableAlias, bridgeJoinCond);
+              
               const joinCond = softDeleteConditions ? and(eq(joinRelatedCol, relatedCol), softDeleteConditions) : eq(joinRelatedCol, relatedCol);
               currentQb = currentQb.leftJoin(aliased, joinCond);
            }

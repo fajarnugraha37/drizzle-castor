@@ -1,6 +1,7 @@
 import type { Middleware } from "./index";
 import { AccessDeniedError } from "../errors";
 import type { RepoProfileConfig } from "../types";
+import { CONJUNCTION_OPERATORS } from "../types";
 
 function mergePermissions(profiles: string[], options: Record<string, RepoProfileConfig<any, any>>) {
   let allowedProjections: Set<string> | "*" | null = null;
@@ -82,7 +83,7 @@ function extractFilterKeys(filter: any): string[] {
       return;
     }
     for (const [k, v] of Object.entries(obj)) {
-      if (k === "$and" || k === "$or" || k === "$not") {
+      if ((CONJUNCTION_OPERATORS as readonly string[]).includes(k)) {
         traverse(v);
       } else if (!k.startsWith("$")) {
         keys.add(k);
@@ -105,7 +106,7 @@ function trimFilterObj(filter: any, allowedSet: Set<string> | "*"): any {
   let hasKeys = false;
   
   for (const [k, v] of Object.entries(filter)) {
-    if (k === "$and" || k === "$or" || k === "$not") {
+    if ((CONJUNCTION_OPERATORS as readonly string[]).includes(k)) {
       const sub = trimFilterObj(v, allowedSet);
       if (sub !== undefined && Object.keys(sub).length > 0) {
         trimmed[k] = sub;
@@ -117,8 +118,8 @@ function trimFilterObj(filter: any, allowedSet: Set<string> | "*"): any {
         hasKeys = true;
       }
     } else {
-      trimmed[k] = v;
-      hasKeys = true;
+      // BUG-6 FIX: Unknown $ operators are discarded (Fail-Closed)
+      console.warn(`[Field-RBAC] Discarding unknown reserved keyword in filter: ${k}`);
     }
   }
   return hasKeys ? trimmed : undefined;

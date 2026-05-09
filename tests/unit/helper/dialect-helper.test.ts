@@ -3,17 +3,27 @@ import {
   getDialect,
   supportsReturning,
   generateTempTableName,
+  getPrimaryKeyPropertyNames,
 } from "../../../src/helper/dialect-helper";
+import { pgTable, serial, primaryKey } from "drizzle-orm/pg-core";
 
 describe("dialect-helper", () => {
   describe("getDialect", () => {
-    test("should return 'pg' for PgDialect", () => {
-      const db = { dialect: { constructor: { name: "PgDialect" } } };
+    test("should return 'pg' for Postgres-like dialect", () => {
+      const db = { 
+        dialect: { 
+          escapeParam: (i: number) => `$${i + 1}`
+        } 
+      };
       expect(getDialect(db)).toBe("pg");
     });
 
-    test("should return 'mysql' for MySqlDialect", () => {
-      const db = { dialect: { constructor: { name: "MySqlDialect" } } };
+    test("should return 'mysql' for MySQL-like dialect", () => {
+      const db = { 
+        dialect: { 
+          escapeName: (n: string) => `\`${n}\``
+        } 
+      };
       expect(getDialect(db)).toBe("mysql");
     });
 
@@ -31,6 +41,25 @@ describe("dialect-helper", () => {
       const db = { dialect: { constructor: { name: "OracleDialect" } } };
       expect(getDialect(db)).toBe("sqlite");
     });
+    
+    test("should return true for unknown dialect (defaults to sqlite)", () => {
+      const db = { dialect: { constructor: { name: "UnknownDialect" } } };
+      expect(supportsReturning(db)).toBe(true);
+    });
+
+    test("should return true when db is null (defaults to sqlite)", () => {
+      expect(supportsReturning(null)).toBe(true);
+    });
+
+    test("should return 'sqlite' for SQLite-like dialect (fallback)", () => {
+      const db = { 
+        dialect: { 
+          escapeName: (n: string) => `"${n}"`,
+          escapeParam: () => `?`
+        } 
+      };
+      expect(getDialect(db)).toBe("sqlite");
+    });
 
     test("should return 'sqlite' when db or dialect is missing", () => {
       expect(getDialect({})).toBe("sqlite");
@@ -43,27 +72,61 @@ describe("dialect-helper", () => {
 
   describe("supportsReturning", () => {
     test("should return true for pg", () => {
-      const db = { dialect: { constructor: { name: "PgDialect" } } };
+      const db = { dialect: { escapeParam: (i: number) => `$${i + 1}` } };
       expect(supportsReturning(db)).toBe(true);
     });
 
     test("should return true for sqlite", () => {
-      const db = { dialect: { constructor: { name: "SQLiteDialect" } } };
+      const db = { dialect: { escapeParam: () => "?" } };
       expect(supportsReturning(db)).toBe(true);
     });
 
     test("should return false for mysql", () => {
-      const db = { dialect: { constructor: { name: "MySqlDialect" } } };
+      const db = { dialect: { escapeName: (n: string) => `\`${n}\`` } };
       expect(supportsReturning(db)).toBe(false);
     });
+  });
 
-    test("should return true for unknown dialect (defaults to sqlite)", () => {
-      const db = { dialect: { constructor: { name: "UnknownDialect" } } };
-      expect(supportsReturning(db)).toBe(true);
+  describe("getPrimaryKeyPropertyNames", () => {
+    test("should find column-level primary keys", () => {
+      const testTable = pgTable("test_col_pk", {
+        uuid: serial("uuid").primaryKey(),
+      });
+      
+      const pks = getPrimaryKeyPropertyNames(testTable);
+      expect(pks).toEqual(["uuid"]);
     });
 
-    test("should return true when db is null (defaults to sqlite)", () => {
-      expect(supportsReturning(null)).toBe(true);
+    test("should find table-level primary keys", () => {
+      const testTable = pgTable("test_table_pk", {
+        id: serial("id"),
+      }, (table) => ({
+        pk: primaryKey({ columns: [table.id] }),
+      }));
+
+      const pks = getPrimaryKeyPropertyNames(testTable);
+      expect(pks).toEqual(["id"]);
+    });
+
+    test("should find composite primary keys", () => {
+      const testTable = pgTable("test_composite_pk", {
+        tenantId: serial("tenant_id"),
+        userId: serial("user_id"),
+      }, (table) => ({
+        pk: primaryKey({ columns: [table.tenantId, table.userId] }),
+      }));
+
+      const pks = getPrimaryKeyPropertyNames(testTable);
+      expect(pks.sort()).toEqual(["tenantId", "userId"].sort());
+    });
+
+    test("should return empty if no primary key found", () => {
+      const testTable = pgTable("test_no_pk", {
+        name: serial("name"),
+      });
+
+      const pks = getPrimaryKeyPropertyNames(testTable);
+      expect(pks).toEqual([]);
     });
   });
 
@@ -73,16 +136,16 @@ describe("dialect-helper", () => {
       expect(name.startsWith("_tmp_castor_")).toBe(true);
       expect(name.length).toBeGreaterThan("_tmp_castor_".length);
     });
+  });
 
-    test("should return unique names on subsequent calls", () => {
-      const name1 = generateTempTableName();
-      const name2 = generateTempTableName();
-      expect(name1).not.toBe(name2);
-    });
+  test("should return unique names on subsequent calls", () => {
+    const name1 = generateTempTableName();
+    const name2 = generateTempTableName();
+    expect(name1).not.toBe(name2);
+  });
 
-    test("should not contain dots", () => {
-      const name = generateTempTableName();
-      expect(name).not.toContain(".");
-    });
+  test("should not contain dots", () => {
+    const name = generateTempTableName();
+    expect(name).not.toContain(".");
   });
 });
