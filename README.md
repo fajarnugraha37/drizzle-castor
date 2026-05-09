@@ -1,9 +1,25 @@
+<h1 align="center">
+  <a href="https://github.com/fajarnugraha37/drizzle-castor">
+    <picture>
+      <img height="500" alt="GOUSS" src="https://raw.githubusercontent.com/fajarnugraha37drizzle-castor/refs/heads/main/docs/logo.png">
+    </picture>
+  </a>
+</h1>
+<p align="center">
+    <em><b>drizzle-castor</b> is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over [Drizzle ORM](https://orm.drizzle.team/). It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
+    </em>
+</p>
+
+---
+
 # Drizzle-Castor
 
+[![SQLite](https://img.shields.io/badge/Bun-1.0+-green.svg)](https://bun.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.30+-green.svg)](https://orm.drizzle.team/)
-
-`drizzle-castor` is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over [Drizzle ORM](https://orm.drizzle.team/). It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
+[![SQLite](https://img.shields.io/badge/SQLite-3.9.0+-green.svg)](https://sqlite.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-green.svg)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/PostgreSQL-8+-green.svg)](https://www.mysql.com/)
 
 ## Features
 
@@ -42,7 +58,7 @@ bun add @fajarnugraha37/drizzle-castor drizzle-orm
 ### Quick Usage
 
 > [!NOTE]
-> For a more detailed guide on setup, relations, and policy definitions, please refer to the [Quick Start Guide](./QUICKSTART.md).
+> For a more detailed guide on setup, relations, and policy definitions, please refer to the [Quick Start Guide](./docs/QUICKSTART.md).
 
 ```typescript
 import { drizzle } from "drizzle-orm/bun-sqlite";
@@ -93,9 +109,9 @@ The library implements a **Middleware-Driven Repository Pattern** functioning as
 ```
 
 For detailed architectural diagrams and internal mechanics, refer to the following documentation:
-- [Project Architecture Blueprint](./Project_Architecture_Blueprint.md)
-- [How It Works](./HOW_IT_WORKS.md)
-- [Coding Standards](./CODING_STANDARDS.md)
+- [Project Architecture Blueprint](./docs/ARCHITECTURE.md)
+- [How It Works](./docs/HOW_IT_WORKS.md)
+- [Coding Standards](./docs/CODING_STANDARDS.md)
 
 ### Directory Structure
 ```text
