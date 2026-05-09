@@ -71,20 +71,7 @@ async function playground() {
     .use(customMiddleware)
     .build();
 
-  const userRepo = builder.repoFactory("users", {
-    default: {
-      allowedProjections: ['name', 'persona.skills', 'settings.theme', 'occupational.period.start', 'posts.title', 'posts.comments.content'],
-      allowedFilters: ['occupational.company', 'persona.skills', 'settings.theme'],
-      allowedSets: ["*"],
-      allowedSorts: ["*"],
-    },
-    admin: {
-      allowedProjections: ["*"],
-      allowedFilters: ["*"],
-      allowedSets: ["*"],
-      allowedSorts: ["*"],
-    },
-  });
+  const userRepo = builder.repoFactory("users");
 
   const one = await userRepo.searchOne({
     projection: [
@@ -140,9 +127,7 @@ async function playground() {
     // Calling with a non-existent profile in strict mode
     const strictBuilder = (await import("../src/schema-metadata-builder")).createSchemaBuilder(builder.db, builder.tables, "strict");
     const strictMeta = strictBuilder.build();
-    const strictRepo = strictMeta.repoFactory("users", {
-      default: { allowedProjections: ["*"] }
-    });
+    const strictRepo = strictMeta.repoFactory("users");
     await strictRepo.searchMany({}, "hacker_profile" as any);
     console.error("❌ FAILED: The unvalidated profile did not throw an error.");
   } catch (error: any) {
@@ -171,7 +156,7 @@ async function playground() {
   console.log("JSON Array Extraction Result:", JSON.stringify(jsonArrayResult, null, 2));
 
   console.log("\n--- Testing RBAC Trimming ---");
-  const trimmedRepo = builder.repoFactory("users", {});
+  const trimmedRepo = builder.repoFactory("users");
 
   const trimmedQuery = await trimmedRepo.searchMany({
     projection: ["name", "persona"],

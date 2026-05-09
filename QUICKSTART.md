@@ -158,31 +158,85 @@ const userRepo = schemaMetadata.repoFactory("users", {
 
 The generated Repository provides strongly-typed methods. You must always pass the active `profile` (e.g., `"admin"`) to evaluate against the RBAC engine.
 
-### A. Reading Data
-You can utilize standard filters, projections, and JSON dot-notation paths.
+### A. Reading Data (Relations & JSON Paths)
+You can utilize standard filters, projections, and deep dot-notation paths. The AST Translator will automatically build the necessary SQL `JOIN`s or JSON extraction functions under the hood.
 
 ```typescript
-// Fetch a single record
+// Fetch a single record with Deep Relations and JSON extraction
 const user = await userRepo.searchOne({
-  projection: ["name", "profile.bio", "settings.theme"], // Safely extracts JSON!
+  projection: [
+    "name", 
+    "profile.bio",               // 1:1 Relation
+    "posts.title",               // 1:N Relation
+    "posts.comments.content",    // Nested 1:N Relation
+    "settings.theme",            // JSON Object extraction
+    "persona.skills.0"           // JSON Array extraction (Index 0)
+  ], 
   filter: {
     $or: [
       { name: { $like: "%John%" } },
-      { "settings.theme": { $eq: "dark" } } // Query directly against JSON columns
+      { "settings.theme": { $eq: "dark" } },      // Query directly against JSON columns
+      { "persona.skills.0": { $eq: "Node.js" } }, // Query against an array index
+      { "posts.title": { $like: "%Drizzle%" } }   // Filter by a related table's column
     ]
+  },
+  order: {
+    "createdAt": "desc",
+    "posts.comments.createdAt": "desc" // Order by nested relation
   }
 }, "admin");
+```
 
-// Fetch multiple records
+#### The Hydrated Return Format
+Unlike raw SQL which returns flat rows with duplicated data, `drizzle-castor` automatically hydrates and collapses the results back into a clean, nested JavaScript object reflecting your query shape:
+
+```json
+{
+  "id": 1,
+  "name": "John Doe",
+  "settings": {
+    "theme": "dark"
+  },
+  "persona": {
+    "skills": ["Node.js"]
+  },
+  "profile": {
+    "id": 101,
+    "bio": "Backend Developer"
+  },
+  "posts": [
+    {
+      "id": 201,
+      "title": "Learning Drizzle",
+      "comments": [
+        { "id": 301, "content": "Great post!" },
+        { "id": 302, "content": "Thanks for sharing." }
+      ]
+    }
+  ]
+}
+```
+
+#### Fetching Collections & Pagination
+
+```typescript
+// Fetch multiple records (Returns an Array of objects)
 const users = await userRepo.searchMany({
   order: { createdAt: "desc" }
 }, "admin");
 
-// Fetch paginated results (Returns `{ data, meta: { totalItems, totalPages... } }`)
+// Fetch paginated results
 const page = await userRepo.searchPage({
   page: 1,
-  pageSize: 10
+  pageSize: 10,
+  filter: { "posts.comments.content": { $isNotNull: true } }
 }, "public");
+
+// Returns:
+// { 
+//   data: [{ id: 1, name: "John", posts: [...] }, ...], 
+//   meta: { currentPage: 1, pageSize: 10, totalPages: 5, totalItems: 42 } 
+// }
 ```
 
 ### B. Creating Data

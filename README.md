@@ -3,7 +3,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 [![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.30+-green.svg)](https://orm.drizzle.team/)
 
-`drizzle-castor` is a robust, type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over [Drizzle ORM](https://orm.drizzle.team/). It provides a developer-friendly JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and safe multi-dialect execution strategies.
+`drizzle-castor` is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over [Drizzle ORM](https://orm.drizzle.team/). It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
 
 ## Features
 
