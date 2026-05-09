@@ -53,11 +53,14 @@ export function buildSelection(
       if (!selection[aliasName]) {
         selection[aliasName] = {};
         if (targetTable) {
-           const relTableObj = resolution.nodes[resolution.nodes.length - 1]?.relatedTable;
-           const relPkName = relTableObj ? getPrimaryKeyColumnName(metadata[relTableObj]?.table || targetTable) : "id";
-           if (targetTable[relPkName]) {
-             selection[aliasName][relPkName] = targetTable[relPkName]; // Always include relation PK for hydration
-           }
+          const lastNode = resolution.nodes[resolution.nodes.length - 1];
+          const relTableObjName = lastNode?.relatedTable;
+          const relTable = relTableObjName ? metadata[relTableObjName]?.table : undefined;
+          const pkTable = relTable || targetTable;
+          const relPkName = getPrimaryKeyColumnName(pkTable);
+          if (targetTable[relPkName]) {
+            selection[aliasName][relPkName] = targetTable[relPkName]; // Always include relation PK for hydration
+          }
         }
       }
     } else {
