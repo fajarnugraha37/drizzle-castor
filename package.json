@@ -1,7 +1,7 @@
 {
   "name": "@fajarnugraha37/drizzle-castor",
   "private": false,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A CRUD library for Drizzle ORM, designed to simplify database operations with a focus on type safety and ease of use.",
   "keywords": [
     "drizzle",
@@ -35,6 +35,7 @@
   "files": [
     "dist",
     "README.md",
+    "QUICKSTART.md",
     "LICENSE"
   ],
   "scripts": {

@@ -1,239 +1,252 @@
-# Quickstart: Drizzle Castor
+# Quick Start: Drizzle-Castor
 
-Get up and running with Drizzle Castor in under 5 minutes.
+`drizzle-castor` is a type-safe CRUD library and Data Access Object (DAO) abstraction over Drizzle ORM. It simplifies database operations by providing a JSON-based querying syntax, native soft-deletes, unified Role-Based Access Control (RBAC), and dialect-agnostic execution strategies.
 
-## 1. Installation
+---
 
-```bash
-npm install @fajarnugraha37/drizzle-castor
-# or
-bun add @fajarnugraha37/drizzle-castor
-```
+## 1. Setup & Configuration
 
-## 2. Define Schema & Metadata
-
-Drizzle Castor needs to know about your tables and how they relate.
+First, initialize your standard Drizzle ORM database instance and your schema tables. Then, use `createSchemaBuilder` to configure your library.
 
 ```typescript
-import { db } from "./db";
-import { users, posts } from "./schema";
-import { defineSchemaMetadata } from "@fajarnugraha37/drizzle-castor";
+import { drizzle } from "drizzle-orm/bun-sqlite"; // Or pg/mysql
+import { createSchemaBuilder } from "@fajarnugraha37/drizzle-castor";
+import { usersTable, postsTable, profilesTable } from "./schema";
 
-export const schema = defineSchemaMetadata(db, [users, posts])({
-  users: {
-    oneToMany: [
-      {
-        relationName: "posts",
-        relatedTable: "posts",
-        foreignKey: "posts.userId",
-        localKey: "users.id",
-      },
-    ],
-    profiles: {
-      admin: ["read", "create", "update", "hardDelete"],
-      guest: ["read"],
-    },
-  },
-  posts: {
-    manyToOne: [
-      {
-        relationName: "author",
-        relatedTable: "users",
-        localKey: "posts.userId",
-        foreignKey: "users.id",
-      },
-    ],
-    profiles: {
-      guest: ["read"],
-    },
-  },
-});
+const db = drizzle("sqlite.db");
+
+// 1. Instantiate the Builder
+export const schemaMetadataBuilder = createSchemaBuilder(db, [
+  usersTable,
+  postsTable,
+  profilesTable
+] as const, "lenient"); // Use "strict" to block all actions without an explicit RBAC policy
 ```
 
-## 3. Create a Repository
+---
 
-Repositories are typed based on your profile definitions.
+## 2. Defining Relations & Capabilities
 
-```typescript
-const userRepo = schema.repoFactory("users", {
-  guest: {
-    allowedProjections: ["id", "name"], // Guests can't see emails
-    allowedFilters: ["name"],
-  },
-  admin: {
-    allowedProjections: ["*"], // Admins see everything
-  }
-});
-```
-
-## 4. Query with Power
-
-No more manual joins. Just use dot-notation.
+Define your table relationships and soft-delete behaviors dynamically without cluttering your physical Drizzle schema.
 
 ```typescript
-// Deeply nested search with automatic hydration
-const results = await userRepo.searchMany({
-  projection: [
-    "name",
-    "posts.title" // Automatically joins and nests posts
+schemaMetadataBuilder.table("users", {
+  // Define 1:1, 1:N, M:1, and M:N relationships
+  oneToOne: [
+    {
+      relationName: "profile",
+      relatedTable: "profiles",
+      localKey: "users.id",
+      foreignKey: "profiles.userId",
+    }
   ],
-  filter: {
-    "posts.title": { $ilike: "%drizzle%" }
-  }
-}, "guest");
-```
-
-## 5. Relationship and Join Capabilities
-
-Drizzle Castor handles complex relationships automatically through its "Split Query" architecture.
-
-- **Deep Joins**: Query across multiple levels of relations (e.g., `posts.comments.author.name`).
-- **Fan-out Protection**: Prevents duplicate parent records when joining one-to-many or many-to-many relations.
-- **Automatic Hydration**: Flat database rows are transformed into deeply nested object trees.
-
-```typescript
-const detailedResults = await userRepo.searchMany({
-  projection: [
-    "name",
-    "posts.title",
-    "posts.comments.content",
-    "posts.comments.author.name"
-  ]
-});
-```
-
-## 6. JSON Column Support
-
-Query and project properties inside JSON columns using dot-notation, just like relations.
-
-```typescript
-// Assuming 'metadata' is a JSON column
-const results = await userRepo.searchMany({
-  projection: ["name", "metadata.theme.color"],
-  filter: {
-    "metadata.settings.notifications": { $eq: true }
-  }
-});
-```
-
-## 7. Soft Deletion
-
-Configure records to be marked as deleted instead of being physically removed from the database.
-
-### Configuration
-
-Add the `softDelete` property to your table metadata.
-
-```typescript
-users: {
+  oneToMany: [
+    {
+      relationName: "posts",
+      relatedTable: "posts",
+      localKey: "users.id",
+      foreignKey: "posts.userId",
+    },
+  ],
+  // Enable Soft Delete capabilities automatically
   softDelete: {
-    // Values to set when deleting
-    deleteValue: {
-      deletedAt: () => Date.now(),
-      deletedFlag: 1,
-    },
-    // Values to set when restoring
-    restoreValue: {
-      deletedAt: null,
-      deletedFlag: 0,
-    }
+    deleteValue: { deletedFlag: 1 },
+    restoreValue: { deletedFlag: 0 },
   },
-  profiles: {
-    admin: ["read", "create", "update", "softDelete", "restore", "hardDelete"],
+});
+```
+
+---
+
+## 3. Defining Unified RBAC Policies (Access Control)
+
+`drizzle-castor` enforces security intrinsically at the Data Access layer. Rather than writing authorization checks in every service function, you define policies at the Schema Builder level. The Unified RBAC middleware intercepts every database request, evaluating the active profile against the policies before the query reaches Drizzle ORM.
+
+### A. Strict vs Lenient Mode
+When creating the schema builder, you define an execution mode:
+- **`lenient` (Default)**: If a table has no policy defined, all actions are permitted. Unspecified rules default to allowing access.
+- **`strict`**: Every table *must* have an explicit policy. If a user queries a table without an assigned policy, an `AccessDeniedError` is immediately thrown.
+
+### B. What is a Profile?
+A Profile represents the role or persona executing the database action (e.g., `"public"`, `"admin"`, `"user"`).
+- When calling a repository method, you *must* pass the profile: `await repo.searchOne(..., "admin")`.
+- **Multiple Profiles**: You can pass an array of profiles (e.g., `["public", "editor"]`). The RBAC engine will safely **merge** the capabilities of all matched profiles. If one profile allows a field and the other doesn't, the field is allowed (Union). If no profile is provided, it falls back to `"default"`.
+
+### C. Action-Level Access Control
+The `allowedActions` property defines which physical database operations the profile can perform.
+- Available actions: `"create"`, `"read"`, `"update"`, `"softDelete"`, `"restore"`, `"hardDelete"`.
+- If a profile attempts an action not explicitly listed in their policy (e.g., calling `.updateMany()` when they only have `["read"]`), the middleware throws an `AccessDeniedError`.
+- Use `"*"` to grant full CRUD permissions.
+
+### D. Field-Level Access Control (Data Trimming)
+Instead of throwing hard errors when an unauthorized field is requested, the RBAC engine employs **Intelligent Data Trimming**. It silently removes unauthorized fields from the payload, allowing the safe parts of the query to execute. *(Note: If all fields in a clause are trimmed and the clause becomes empty, it will then throw an error).*
+
+- **`allowedProjections` (SELECT Clause)**: Restricts what data can be returned. If a user requests `projection: ["name", "email", "passwordHash"]` but only `"name"` is allowed, the query seamlessly executes as `SELECT name FROM...`.
+- **`allowedFilters` (WHERE Clause)**: Restricts which fields the user can query against. The engine recursively traverses complex `$and` / `$or` / `$not` AST trees. If a condition targets an unpermitted field, that specific node is discarded without breaking the rest of the filter logic.
+- **`allowedSets` (INSERT / UPDATE Clauses)**: Prevents writing to restricted columns. If a payload tries to update `{ name: "John", role: "admin" }` but `"role"` is restricted, only the `"name"` update is sent to the database.
+- **`allowedSorts` (ORDER BY Clause)**: Drops unpermitted sorting keys.
+
+*Note on JSON & Relations:* Field rules fully support JSON dot-notation and relational paths. Allowing a parent path (e.g., `"settings"`) implicitly allows querying any nested JSON property within it (e.g., `"settings.theme"`).
+
+### E. Static vs Dynamic Policies
+Policies can be statically defined objects or asynchronous functions that resolve rules dynamically based on the current `ExecutionContext` (which carries contextual data like tenant IDs or request headers).
+
+```typescript
+schemaMetadataBuilder.profiles(['default', 'public', 'admin', 'tenant_user'] as const);
+
+schemaMetadataBuilder.policies('users', {
+  // 1. Static Policy: Applied consistently to the 'public' profile
+  public: { 
+    allowedActions: ["read"],
+    allowedFilters: ["name", "email", "settings.theme"], // Allows filtering on JSON properties!
+    allowedProjections: ["name", "profile.bio"], // Allows fetching relational data!
+  },
+  
+  // 2. Static Wildcard: Full access for 'admin'
+  admin: {
+    allowedActions: "*",
+    allowedSets: "*",
+    allowedProjections: "*",
+    allowedFilters: "*",
+    allowedSorts: "*"
+  },
+
+  // 3. Dynamic Policy: Resolves permissions at runtime
+  tenant_user: async (ctx) => {
+    // Inspect ctx variables set by upstream authentication middlewares
+    const isOwner = ctx.params.filter?.id?.$eq === ctx.variables?.userId;
+    
+    return {
+      allowedActions: isOwner ? ["read", "update"] : ["read"],
+      allowedSets: ["settings.theme", "persona.skills"],
+      // Dynamic field resolution is also supported
+      allowedProjections: async (innerCtx) => {
+        return isOwner ? ["*"] : ["name", "avatar"];
+      },
+      allowedFilters: "*",
+      allowedSorts: "*"
+    };
   }
-}
+});
 ```
 
-### Usage
+---
 
-Once configured, use the dedicated soft delete methods. Active records are automatically filtered in standard search methods.
+## 4. Finalizing and Creating Repositories
+
+Once configured, build the metadata and instantiate a repository for a specific table.
 
 ```typescript
-// Soft delete a record
-await userRepo.softDeleteOne(userId, "admin");
+// Finalize the global configuration
+export const schemaMetadata = schemaMetadataBuilder.build();
 
-// Search only deleted records
-const deletedUsers = await userRepo.searchDeletedMany({
-  projection: ["name", "deletedAt"]
-}, "admin");
-
-// Restore a record
-await userRepo.restoreOne(userId, "admin");
+// Create a typed Repository for the "users" table
+const userRepo = schemaMetadata.repoFactory("users");
 ```
 
-## 8. Lifecycle Hooks
-
-Inject custom logic before or after database operations.
+You can also override or append specific RBAC configurations at the repository generation level:
 
 ```typescript
-posts: {
-  hooks: {
-    beforeSearch: async (query) => {
-      console.log("Searching posts with query:", query);
-    },
-    afterSearch: async (query, results) => {
-      console.log(`Found ${results.length} results`);
-    }
-  }
-}
+const userRepo = schemaMetadata.repoFactory("users", {
+  public: { allowedProjections: ["id", "name"] } // Local override
+});
 ```
 
-## 9. Filter Operators Reference
+---
 
-Drizzle Castor supports a wide range of operators for complex filtering.
+## 5. Available Repository Methods
 
-### Comparison
-- `$eq`, `$ne`: Equal, Not Equal
-- `$gt`, `$gte`: Greater Than, Greater Than or Equal
-- `$lt`, `$lte`: Less Than, Less Than or Equal
-- `$isNull`, `$notIsNull`: Null checks
+The generated Repository provides strongly-typed methods. You must always pass the active `profile` (e.g., `"admin"`) to evaluate against the RBAC engine.
 
-### String
-- `$like`, `$ilike`: Case-sensitive and Case-insensitive like
-- `$notLike`, `$notIlike`: Negated like patterns
-
-### Array and Range
-- `$in`, `$notIn`: Check if value is in a list
-- `$between`, `$notBetween`: Range checks
-- `$arrayContains`: For Postgres/JSON arrays
-
-### Logical
-- `$and`, `$or`, `$not`: Combine multiple conditions
+### A. Reading Data
+You can utilize standard filters, projections, and JSON dot-notation paths.
 
 ```typescript
-{
+// Fetch a single record
+const user = await userRepo.searchOne({
+  projection: ["name", "profile.bio", "settings.theme"], // Safely extracts JSON!
   filter: {
     $or: [
-      { status: { $eq: "active" } },
-      { "metadata.version": { $gt: 2 } }
+      { name: { $like: "%John%" } },
+      { "settings.theme": { $eq: "dark" } } // Query directly against JSON columns
     ]
   }
-}
-```
-
-## 10. Basic CRUD
-
-```typescript
-// Create
-const newUser = await userRepo.createOne({
-  name: "Alice",
-  email: "alice@example.com"
 }, "admin");
 
-// Update
-await userRepo.updateOne(newUser.id, {
-  name: "Alice Updated"
+// Fetch multiple records
+const users = await userRepo.searchMany({
+  order: { createdAt: "desc" }
 }, "admin");
 
-// Paginate
-const { data, meta } = await userRepo.searchPage({
+// Fetch paginated results (Returns `{ data, meta: { totalItems, totalPages... } }`)
+const page = await userRepo.searchPage({
   page: 1,
   pageSize: 10
-}, "guest");
+}, "public");
 ```
 
-## Next Steps
+### B. Creating Data
 
-- Check `README.md` for Soft Delete configuration.
-- See `src/types/query.ts` for a full list of Filter Operators ($gt, $in, $or, etc.).
-- Read `NOTE.md` to understand the TypeScript Engine under the hood.
+```typescript
+// Create a single record
+const newUser = await userRepo.createOne({
+  name: "Jane Doe",
+  email: "jane@example.com"
+}, "admin");
+
+// Create multiple records
+const newUsers = await userRepo.createMany([
+  { name: "Alice", email: "alice@example.com" },
+  { name: "Bob", email: "bob@example.com" }
+], "admin");
+```
+
+### C. Updating Data
+
+```typescript
+// Update by Primary Key
+const updated = await userRepo.updateOne(1, {
+  name: "John Updated",
+  "settings.theme": "light" // Partially update a JSON column securely
+}, "admin");
+
+// Update multiple using abstract filters
+const batchUpdated = await userRepo.updateMany(
+  { age: { $lt: 18 } }, 
+  { "settings.notifications": false }, 
+  "admin"
+);
+```
+
+### D. Deleting & Restoring Data
+If you configured `softDelete` on the table, the Soft Delete and Restore methods become available.
+
+```typescript
+// Soft Delete
+await userRepo.softDeleteOne(1, "admin");
+await userRepo.softDeleteMany({ "settings.theme": { $eq: "light" } }, "admin");
+
+// Restore
+await userRepo.restoreOne(1, "admin");
+
+// Hard Delete (Permanent)
+await userRepo.hardDeleteOne(1, "admin");
+```
+
+---
+
+## 6. Middlewares and Hooks
+
+You can intercept the repository lifecycle using Koa-style middlewares.
+
+```typescript
+schemaMetadataBuilder.use(async (ctx, next) => {
+  console.log(`Executing ${ctx.action} on table ${ctx.tableName}`);
+  
+  // Await the underlying database execution
+  const result = await next();
+  
+  console.log(`Finished execution!`);
+  return result;
+});
+```
