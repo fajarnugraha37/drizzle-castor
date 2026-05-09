@@ -72,6 +72,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@stacksjs/ts-cache": "^0.1.4",
     "drizzle-orm": "^0.45.2",
     "zod": "^4.4.3"
   }

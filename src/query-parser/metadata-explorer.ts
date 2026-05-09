@@ -1,5 +1,18 @@
+import "./../polyfills";
+import { Cache } from "@stacksjs/ts-cache";
 import { QueryParsingError } from "../errors";
 import type { PathResolution, RelationNode, RelationType } from "../types";
+
+const resolutionCache = new Cache({
+  stdTTL: 600,
+  maxKeys: 5000,
+  checkPeriod: 60,
+  useClones: false,
+  deleteOnExpire: true,
+  maxPerformance: true,
+  enableStats: false,
+  enableEvents: false,
+});
 
 /**
  * Traverses the metadata to find the relation definition for a given relation name.
@@ -49,6 +62,12 @@ export function resolvePathSegments(
   baseTableName: string,
   path: string,
 ): PathResolution {
+  const cacheKey = `${baseTableName}:${path}`;
+  const cached = resolutionCache.get<PathResolution>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   const parts = path.split(".");
   const nodes: RelationNode[] = [];
   let currentTable = baseTableName;
@@ -70,11 +89,14 @@ export function resolvePathSegments(
     currentTable = node.relatedTable;
   }
 
-  return {
+  const result: PathResolution = {
     nodes,
     jsonPath: jsonPathSegments.length > 0 ? jsonPathSegments.join(".") : undefined,
     relationPath: relationPathSegments.join(".")
   };
+
+  resolutionCache.set(cacheKey, result);
+  return result;
 }
 
 /**
