@@ -183,6 +183,48 @@ export async function playground() {
     console.log(`❌ FAIL: Global Policy failed for posts (guest): ${e.message}`);
   }
 
+  console.log("\n--- [EDGE CASE] Testing Transaction Management ---");
+  const uniqueEmail = `atom.${Date.now()}@example.com`;
+  try {
+    await schemaMetadata.transaction(async (tx) => {
+      console.log("[Info] Transaction block started");
+      const txUserRepo = tx.repoFactory("users");
+      
+      const newUser = await txUserRepo.createOne({
+        name: "Atomic User",
+        email: uniqueEmail,
+      }, "admin");
+      
+      console.log(`[Info] Created user ${newUser.id} in transaction. Now verifying visibility...`);
+      
+      // Attempt to read the user within the SAME transaction (should be visible)
+      const found = await txUserRepo.searchOne({ filter: { email: { $eq: uniqueEmail } } }, "admin");
+      if (found) {
+        console.log("✅ PASS: Can read own uncommitted changes within transaction.");
+      } else {
+        console.error("❌ FAIL: Cannot read own uncommitted changes.");
+      }
+
+      console.log("[Info] Triggering manual rollback...");
+      throw new Error("Simulated Transaction Rollback");
+    }, { propagation: "REQUIRED" });
+  } catch (err: any) {
+    if (err.message === "Simulated Transaction Rollback") {
+      console.log("✅ PASS: Caught expected rollback error.");
+      
+      // Verify rollback: user should NOT exist in the database
+      const usersWithThatEmail = await userRepo.searchMany({ filter: { email: { $eq: uniqueEmail } } }, "admin");
+      
+      if (usersWithThatEmail.length === 0) {
+        console.log("✅ PASS: Transaction successfully rolled back (data not found).");
+      } else {
+        console.error("❌ FAIL: Transaction did NOT roll back! Data persists.");
+      }
+    } else {
+      console.error(`❌ FAIL: Unexpected error during transaction test: ${err.message}`);
+    }
+  }
+
   // Final Verification
   await new Promise(resolve => setTimeout(resolve, 200)); // Wait for async telemetry
   console.log("\nSummary of Captured Events:");

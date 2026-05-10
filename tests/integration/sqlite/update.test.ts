@@ -1,12 +1,12 @@
 import { expect, test, describe, beforeAll } from "bun:test";
-import { drizzle } from "drizzle-orm/bun-sqlite";
+import { BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
 import { sql } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
-import { users } from "./schema";
+import { migrations, users } from "./schema";
 
 describe("SQLite Integration - Update Operations", () => {
-  let db: any;
+  let db: BunSQLiteDatabase;
   let builder: any;
 
   beforeAll(async () => {
@@ -15,18 +15,9 @@ describe("SQLite Integration - Update Operations", () => {
       logger: true,
     });
 
-    db.run(sql`
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        age INTEGER,
-        metadata TEXT,
-        settings TEXT,
-        deleted_flag INTEGER DEFAULT 0,
-        deleted_at TEXT
-      )
-    `);
+    for (const ddl of migrations) {
+      db.run(ddl);
+    }
 
     builder = createSchemaBuilder(db, [users] as const, "lenient")
       .table("users", {

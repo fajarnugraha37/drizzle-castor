@@ -13,6 +13,7 @@ import type { CastorEvents } from "./telemetry";
 import type { TableConfig } from "./hook";
 import type { ILogger } from "./logger";
 import type { Repository } from "./repository";
+import type { TransactionOptions } from "./context";
 
 export type AnyDatabase =
   | BunSQLiteDatabase
@@ -141,4 +142,8 @@ export type CastorInstance<
   subscribeToTelemetry: (
     subscriber: (ctx: any) => void | Promise<void>,
   ) => () => void;
+  transaction: <T>(
+    callback: (tx: CastorInstance<TDb, TTables, TMetadata>) => Promise<T>,
+    options?: TransactionOptions,
+  ) => Promise<T>;
 };

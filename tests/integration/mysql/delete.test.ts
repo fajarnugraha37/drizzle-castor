@@ -1,37 +1,37 @@
 import { describe, test, before, after } from "node:test";
 import { expect } from "expect";
 import { MySqlContainer, StartedMySqlContainer } from "@testcontainers/mysql";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { sql } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
-import { users } from "./schema";
+import { migrations, users } from "./schema";
 
 describe("MySQL Integration - Delete Operations", () => {
   let container: StartedMySqlContainer;
   let connection: mysql.Connection;
-  let db: any;
+  let db: MySql2Database;
   let builder: any;
 
   before(async () => {
-    container = await new MySqlContainer("mysql:8.0").start();
+    container = await new MySqlContainer("mysql:8.0")
+      .withCommand([
+        "--skip-log-bin",
+        "--performance-schema=OFF",
+        "--innodb-buffer-pool-size=64M",
+        "--sync-binlog=0",
+        "--innodb-flush-log-at-trx-commit=2", // test-safe, lebih cepat
+      ])
+      .withBindMounts([])
+      .withTmpFs({ "/var/lib/mysql": "rw" })
+      .start();
     connection = await mysql.createConnection(container.getConnectionUri());
     db = drizzle(connection, {
       logger: true,
     });
 
-    await db.execute(sql`
-      CREATE TABLE users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name TEXT NOT NULL,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        age INT,
-        metadata JSON,
-        settings JSON,
-        deleted_flag INT DEFAULT 0,
-        deleted_at TIMESTAMP NULL
-      )
-    `);
+    for (const migration of migrations) {
+      await db.execute(migration);
+    }
 
     builder = createSchemaBuilder(db, [users] as const, "lenient")
       .table("users", {
@@ -120,5 +120,24 @@ describe("MySQL Integration - Delete Operations", () => {
 
     const deleted = await userRepo.searchDeletedOne({ filter: { id: { $eq: user.id } } }, "admin");
     expect(deleted).toBeNull();
+  });
+
+  test("Hard Delete Many Consistency", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    
+    // Seed some records
+    await userRepo.createMany([
+      { name: "HM1", email: "hm1@ex.com", age: 100 },
+      { name: "HM2", email: "hm2@ex.com", age: 100 },
+    ], "admin");
+
+    const count = await userRepo.hardDeleteMany({ age: { $eq: 100 } }, "admin");
+    expect(count).toBe(2);
+
+    const found = await userRepo.searchMany({ filter: { age: { $eq: 100 } } }, "admin");
+    expect(found).toHaveLength(0);
+    
+    const deleted = await userRepo.searchDeletedMany({ filter: { age: { $eq: 100 } } }, "admin");
+    expect(deleted).toHaveLength(0);
   });
 });

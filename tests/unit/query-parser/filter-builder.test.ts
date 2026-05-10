@@ -31,7 +31,7 @@ describe("Query Parser: filter-builder", () => {
   } as any;
 
   const createMockQb = () => {
-    const qb = {
+    const qb: any = {
       where: () => qb,
       limit: () => qb,
       offset: () => qb,
@@ -82,6 +82,14 @@ describe("Query Parser: filter-builder", () => {
     test("returns false when filter touches relations", () => {
       expect(isFilterSimple({ "posts.title": { $eq: "Hello" } }, mockMetadata, "users")).toBe(false);
     });
+
+    test("returns true for nested simple filters", () => {
+       expect(isFilterSimple({ $and: [{ name: "John" }, { age: 20 }] }, mockMetadata, "users")).toBe(true);
+    });
+
+    test("returns false for nested complex filters", () => {
+       expect(isFilterSimple({ $or: [{ name: "John" }, { "posts.id": 1 }] }, mockMetadata, "users")).toBe(false);
+    });
   });
 
   describe("buildSearchQueries", () => {
@@ -94,11 +102,29 @@ describe("Query Parser: filter-builder", () => {
        const res = await buildSearchQueries({} as any, context);
        expect(res).toBeDefined();
     });
+
+    test("builds queries with sorting and nulls position", async () => {
+       const res = await buildSearchQueries({ 
+         order: { name: { direction: "desc", nulls: "first" } } 
+       }, context);
+       expect(res.mainQuery).toBeDefined();
+    });
   });
 
   describe("buildExistsCondition", () => {
     test("builds exists condition successfully without filter", async () => {
        const condition = await buildExistsCondition({}, context, users);
+       expect(condition).toBeDefined();
+    });
+
+    test("builds exists condition with soft delete metadata", async () => {
+       const ctxWithSD = {
+         ...context,
+         metadata: {
+           users: { softDelete: { column: "deleted", deleteValue: 1, restoreValue: 0 } }
+         }
+       };
+       const condition = await buildExistsCondition({ name: "John" }, ctxWithSD, users);
        expect(condition).toBeDefined();
     });
   });

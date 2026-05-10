@@ -5,6 +5,7 @@ import { isMutated } from "../helper";
 import { MutationError } from "../errors";
 import type { ExecutionContext } from "../types/context";
 import { logger } from "../helper/logger-helper";
+import { withTransaction } from "../helper/context-helper";
 
 /**
  * Executes a batch mutation (Many) with race-condition protection.
@@ -29,7 +30,7 @@ export async function executeBatchMutation(
   // STRATEGY A: PostgreSQL / SQLite (Efficient .returning() + Transaction for BUG-3)
   if (supportsReturning(db)) {
     logger.debug(`Using RETURNING strategy for batch mutation on ${baseTableName}`);
-    return await db.transaction(async (tx: any) => {
+    return await withTransaction(ctx, async (tx: any) => {
       try {
         // let whereAst;
         // if (isFilterSimple(searchFilter, metadata, baseTableName)) {
@@ -91,7 +92,7 @@ export async function executeBatchMutation(
 
   // STRATEGY B: Universal Fallback (Temporary Table for scale and atomicity)
   logger.debug(`Using Temporary Table fallback strategy for batch mutation on ${baseTableName}`);
-  return await db.transaction(async (tx: any) => {
+  return await withTransaction(ctx, async (tx: any) => {
     const tempTableName = generateTempTableName();
     const tempTableIdent = sql.identifier(tempTableName);
     

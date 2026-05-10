@@ -88,6 +88,23 @@ describe("Single Executor", () => {
       expect(containsSql(mockTx.execute.mock.calls, "DROP TEMPORARY TABLE")).toBe(true);
     });
 
+    test("Successfully executes with hydrateBefore", async () => {
+      const mutationFn = mock(async () => 1);
+      
+      const result = await executeSingleMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        1,
+        undefined,
+        undefined,
+        true
+      );
+
+      expect(result).toEqual({ id: 1 });
+    });
+
     test("Ensures cleanup and error wrapping on failure", async () => {
       const mutationFn = mock(async () => {
         throw new Error("DB Crash");
@@ -123,13 +140,29 @@ describe("Single Executor", () => {
 
       expect(result).toBeNull();
     });
+
+    test("Returns null if no records mutated", async () => {
+      const mutationFn = mock(async () => 0);
+      
+      const result = await executeSingleMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        1
+      );
+
+      expect(result).toBeNull();
+    });
   });
 
   describe("Strategy A (Returning Supported)", () => {
-    test("Uses .returning() and respects operationFilter", async () => {
+    beforeEach(() => {
       // @ts-ignore
       dialectHelper.supportsReturning.mockImplementation(() => true);
+    });
 
+    test("Uses .returning() and respects operationFilter", async () => {
       const mutationFn = mock(async () => [1]);
       
       const result = await executeSingleMutation(
@@ -143,6 +176,71 @@ describe("Single Executor", () => {
 
       expect(result).toEqual({ id: 1 });
       expect(mockTx.execute).not.toHaveBeenCalled();
+    });
+
+    test("Successfully executes with hydrateBefore", async () => {
+      const mutationFn = mock(async () => [1]);
+      
+      const result = await executeSingleMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        1,
+        undefined,
+        undefined,
+        true
+      );
+
+      expect(result).toEqual({ id: 1 });
+    });
+
+    test("Returns null if no records found for pre-hydration", async () => {
+      // @ts-ignore
+      queryParser.hydrateResults.mockImplementationOnce(() => []);
+
+      const mutationFn = mock(async () => [1]);
+      
+      const result = await executeSingleMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        1,
+        undefined,
+        undefined,
+        true
+      );
+
+      expect(result).toBeNull();
+    });
+
+    test("Returns null if no records mutated", async () => {
+      const mutationFn = mock(async () => []); // Empty array
+      
+      const result = await executeSingleMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        1
+      );
+
+      expect(result).toBeNull();
+    });
+
+    test("Returns null if result is false", async () => {
+      const mutationFn = mock(async () => false);
+      
+      const result = await executeSingleMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        1
+      );
+
+      expect(result).toBeNull();
     });
   });
 });

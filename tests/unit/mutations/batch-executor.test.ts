@@ -89,6 +89,22 @@ describe("Batch Executor", () => {
       expect(containsSql(mockTx.execute.mock.calls, "DROP TEMPORARY TABLE")).toBe(true);
     });
 
+    test("Successfully executes with hydrateBefore", async () => {
+      const mutationFn = mock(async () => 1);
+      
+      const result = await executeBatchMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        {},
+        undefined,
+        true
+      );
+
+      expect(result).toEqual([{ id: 1 }]);
+    });
+
     test("Ensures cleanup and error wrapping on failure", async () => {
       const mutationFn = mock(async () => {
         throw new Error("DB Crash");
@@ -110,6 +126,25 @@ describe("Batch Executor", () => {
       expect(containsSql(mockTx.execute.mock.calls, "DROP TEMPORARY TABLE")).toBe(true);
     });
 
+    test("Rethrows MutationError directly", async () => {
+      const mutationFn = mock(async () => {
+        throw new MutationError("Original Error");
+      });
+
+      try {
+        await executeBatchMutation(
+          mockContext,
+          mockTable,
+          "id",
+          mutationFn,
+          {}
+        );
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(MutationError);
+        expect(e.message).toBe("Original Error");
+      }
+    });
+
     test("Returns empty if no records captured", async () => {
       // Mock capture count to 0
       // @ts-ignore
@@ -127,13 +162,29 @@ describe("Batch Executor", () => {
 
       expect(result).toEqual([]);
     });
+
+    test("Returns empty if no records mutated", async () => {
+      const mutationFn = mock(async () => 0); // 0 records mutated
+      
+      const result = await executeBatchMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        {}
+      );
+
+      expect(result).toEqual([]);
+    });
   });
 
   describe("Strategy A (Returning Supported)", () => {
-    test("Uses .returning() for hydration", async () => {
+    beforeEach(() => {
       // @ts-ignore
       dialectHelper.supportsReturning.mockImplementation(() => true);
+    });
 
+    test("Uses .returning() for hydration", async () => {
       const mutationFn = mock(async () => [1]);
       
       const result = await executeBatchMutation(
@@ -146,6 +197,93 @@ describe("Batch Executor", () => {
 
       expect(result).toEqual([{ id: 1 }]);
       expect(mockTx.execute).not.toHaveBeenCalled();
+    });
+
+    test("Successfully executes with hydrateBefore", async () => {
+      const mutationFn = mock(async () => 1);
+      
+      const result = await executeBatchMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        {},
+        undefined,
+        true
+      );
+
+      expect(result).toEqual([{ id: 1 }]);
+    });
+
+    test("Returns empty if no records found for pre-hydration", async () => {
+      // @ts-ignore
+      queryParser.hydrateResults.mockImplementationOnce(() => []);
+
+      const mutationFn = mock(async () => 1);
+      
+      const result = await executeBatchMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        {},
+        undefined,
+        true
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    test("Returns empty if no records mutated", async () => {
+      const mutationFn = mock(async () => []); // Empty array returned
+      
+      const result = await executeBatchMutation(
+        mockContext,
+        mockTable,
+        "id",
+        mutationFn,
+        {}
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    test("Wraps generic error in MutationError", async () => {
+      const mutationFn = mock(async () => {
+        throw new Error("Strategy A Fail");
+      });
+
+      try {
+        await executeBatchMutation(
+          mockContext,
+          mockTable,
+          "id",
+          mutationFn,
+          {}
+        );
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(MutationError);
+        expect(e.message).toContain("Batch mutation failed: Strategy A Fail");
+      }
+    });
+
+    test("Rethrows MutationError directly", async () => {
+      const mutationFn = mock(async () => {
+        throw new MutationError("Already wrapped");
+      });
+
+      try {
+        await executeBatchMutation(
+          mockContext,
+          mockTable,
+          "id",
+          mutationFn,
+          {}
+        );
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(MutationError);
+        expect(e.message).toBe("Already wrapped");
+      }
     });
   });
 });

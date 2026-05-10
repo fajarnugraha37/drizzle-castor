@@ -1,8 +1,33 @@
 import { expect, test, describe } from "bun:test";
-import { getSoftDeleteConfig } from "../../../src/helper/config-helper";
+import { getSoftDeleteConfig, getTableMetadataConfig } from "../../../src/helper/config-helper";
 import { ConfigurationError } from "../../../src/errors";
 
 describe("config-helper", () => {
+  describe("getTableMetadataConfig", () => {
+    test("should return table config when available", () => {
+      const translatorContext = {
+        metadata: {
+          users: { some: "config" },
+        },
+      } as any;
+      expect(getTableMetadataConfig(translatorContext, "users")).toEqual({
+        some: "config",
+      });
+    });
+
+    test("should return undefined when table is not in metadata", () => {
+      const translatorContext = {
+        metadata: {},
+      } as any;
+      expect(getTableMetadataConfig(translatorContext, "users")).toBeUndefined();
+    });
+
+    test("should return undefined when metadata is missing", () => {
+      const translatorContext = {} as any;
+      expect(getTableMetadataConfig(translatorContext, "users")).toBeUndefined();
+    });
+  });
+
   describe("getSoftDeleteConfig", () => {
     test("should return soft delete config when available", () => {
       const metadata = {

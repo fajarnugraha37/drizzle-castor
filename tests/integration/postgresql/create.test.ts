@@ -1,20 +1,35 @@
 import { describe, test, before, after } from "node:test";
 import { expect } from "expect";
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { sql } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
-import { users, profiles, posts, categories, postsToCategories } from "./schema";
+import { users, profiles, posts, categories, postsToCategories, migrations } from "./schema";
 
 describe("PostgreSQL Integration - Create Operations", () => {
   let container: StartedPostgreSqlContainer;
   let pool: pg.Pool;
-  let db: any;
+  let db: NodePgDatabase;
   let builder: any;
 
   before(async () => {
-    container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    container = await new PostgreSqlContainer("postgres:16-alpine")
+      .withCommand([
+        "postgres",
+        "-c", "shared_buffers=64MB",
+        "-c", "wal_level=minimal",
+        "-c", "max_wal_senders=0",
+        "-c", "synchronous_commit=off",
+        "-c", "fsync=off",           // ⚠️ ONLY FOR TEST
+        "-c", "full_page_writes=off",
+        "-c", "autovacuum=off",
+        "-c", "checkpoint_timeout=30min",
+        "-c", "max_connections=10",
+      ])
+      .withBindMounts([])
+      .withTmpFs({ "/var/lib/postgresql/data": "rw" }) 
+      .start();
     pool = new pg.Pool({
       connectionString: container!.getConnectionUri(),
     });
@@ -22,40 +37,9 @@ describe("PostgreSQL Integration - Create Operations", () => {
       logger: true,
     });
 
-    // Create tables
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        age INTEGER,
-        metadata JSONB,
-        settings JSONB,
-        deleted_flag INTEGER DEFAULT 0,
-        deleted_at TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS profiles (
-        id SERIAL PRIMARY KEY,
-        bio TEXT,
-        user_id INTEGER NOT NULL REFERENCES users(id)
-      );
-      CREATE TABLE IF NOT EXISTS posts (
-        id SERIAL PRIMARY KEY,
-        title TEXT NOT NULL,
-        content TEXT,
-        author_id INTEGER REFERENCES users(id),
-        deleted_flag INTEGER DEFAULT 0
-      );
-      CREATE TABLE IF NOT EXISTS categories (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS posts_to_categories (
-        post_id INTEGER NOT NULL REFERENCES posts(id),
-        category_id INTEGER NOT NULL REFERENCES categories(id),
-        PRIMARY KEY (post_id, category_id)
-      );
-    `);
+    for (const ddl of migrations) {
+      await db.execute(ddl);
+    }
 
     builder = createSchemaBuilder(db, [users, profiles, posts, categories, postsToCategories] as const, "lenient")
       .table("users", {

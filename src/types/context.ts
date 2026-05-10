@@ -1,6 +1,28 @@
 import type { SearchQuery, FilterQuery, UpdateSet } from "./query";
 import type { DbAction, AnyDatabase, AnyTable, TSchemaMetadata, TTranslatorContext } from "./index";
 
+export type TransactionPropagation =
+  | "REQUIRED"
+  | "REQUIRES_NEW"
+  | "NESTED"
+  | "SUPPORTS"
+  | "MANDATORY"
+  | "NEVER";
+
+export type TransactionIsolationLevel =
+  | "read uncommitted"
+  | "read committed"
+  | "repeatable read"
+  | "serializable";
+
+export interface TransactionOptions {
+  propagation?: TransactionPropagation;
+  isolationLevel?: TransactionIsolationLevel;
+  accessMode?: "read only" | "read write";
+  /** MySQL specific */
+  withConsistentSnapshot?: boolean;
+}
+
 export type ExecutionContextParams<TEntity = any> = {
   query?: SearchQuery<TEntity>;
   data?: any | any[];
@@ -43,6 +65,8 @@ export interface ExecutionContext<
   metadata: TMetadata;
   /** Internal state bag for middleware communication */
   state: TState;
+  /** Whether the current context is running within an active transaction */
+  isInTransaction?: boolean;
   /** Schema metadata and database instances */
   translatorContext: TTranslatorContext<TDb, TTables>;
 }

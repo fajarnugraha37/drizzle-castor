@@ -2,6 +2,7 @@ import { supportsReturning } from "../helper/dialect-helper";
 import { buildSearchQueries, hydrateResults } from "../query-parser";
 import { MutationError } from "../errors";
 import type { ExecutionContext } from "../types/context";
+import { withTransaction } from "../helper/context-helper";
 
 /**
  * Executes a single record creation (One) with dialect-aware re-hydration.
@@ -15,7 +16,7 @@ export async function executeCreateOneMutation(
   const { translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
 
-  return await db.transaction(async (tx: any) => {
+  return await withTransaction(ctx, async (tx: any) => {
     try {
       let insertedId: any;
 
@@ -60,7 +61,7 @@ export async function executeCreateManyMutation(
 
   if (!data || data.length === 0) return [];
 
-  return await db.transaction(async (tx: any) => {
+  return await withTransaction(ctx, async (tx: any) => {
     try {
       let insertedIds: any[] = [];
 
