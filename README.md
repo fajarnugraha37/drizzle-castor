@@ -1,7 +1,7 @@
 <h1 align="center">
   <a href="https://github.com/fajarnugraha37/drizzle-castor">
     <picture>
-      <img height="500" alt="Drizzle Castor" src="https://raw.githubusercontent.com/fajarnugraha37drizzle-castor/refs/heads/main/docs/logo-001.png">
+      <img height="500" alt="Drizzle Castor" src="https://raw.githubusercontent.com/fajarnugraha37/drizzle-castor/refs/heads/main/docs/logo-001.png">
     </picture>
   </a>
 </h1>
