@@ -36,4 +36,5 @@ jobs:
           # Use 'tag' script instead of 'publish' to only generate tags and GH Releases
           publish: bun run tag
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # IMPORTANT: Using a PAT allows this action to trigger other workflows (NPM/JSR)
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}

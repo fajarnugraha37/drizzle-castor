@@ -24,5 +24,11 @@ jobs:
       - name: Install Dependencies
         run: bun install --frozen-lockfile
 
+      - name: Sync version to jsr.json
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Syncing jsr.json to version $VERSION"
+          node -e "const fs = require('fs'); const jsr = JSON.parse(fs.readFileSync('./jsr.json', 'utf8')); jsr.version = '$VERSION'; fs.writeFileSync('./jsr.json', JSON.stringify(jsr, null, 2) + '\n');"
+
       - name: Publish to JSR
         run: bunx jsr publish
