@@ -22,7 +22,10 @@ The repository is organized into distinct domain boundaries to separate concerns
 ├───src/                         # Main library source code
 │   ├───context/                 # Execution context manager (Thread-local state)
 │   ├───errors/                  # Custom error classes (Security, Parsing, Mutation)
-│   ├───helper/                  # Shared utilities (Dialect, Assertions, Types)
+│   ├───helper/                  # Shared utilities (Dialect, Assertions, Types, Logger)
+│   │   ├───logger-helper.ts     # Pattern-based logging powered by Pino
+│   │   ├───soft-delete-helper.ts# Declarative soft-delete injection
+│   │   └───...
 │   ├───middleware/              # Koa-style pipeline and Unified RBAC engine
 │   ├───mutations/               # Physical executors for INSERT, UPDATE, DELETE
 │   ├───queries/                 # Physical executors for SELECT and Hydration
@@ -114,14 +117,18 @@ The repository is organized into distinct domain boundaries to separate concerns
 - **Pattern**: Thrown internally and optionally caught or propagated. Strict race-condition protection is applied using transaction-bound Temporary Tables (MySQL) or `RETURNING` clauses.
 
 ### Logging & Monitoring
-- **Implementation**: Event-driven architecture using **`mitt`**. Events are emitted as structured JSON objects.
-- **Event-Driven Dispatch**: Replaced legacy telemetry subscribers with an asynchronous event bus.
+- **Technology Stack**:
+  - **Logging**: Powered by **`pino`** with a custom `PatternFormatter`.
+  - **Telemetry**: Event-driven using **`mitt`**.
+- **Approach**: 
+  - **Internal Logging**: Configurable via `builder.withLogger()`. Supports patterns (e.g., `%d %p [%c] (%t) %s`) and context injection (extracting traceId or nested operation parameters).
+  - **External Telemetry**: Emits structured events via an asynchronous event bus.
 - **Event Categories**:
-  - `execution`: Performance, audit trail, and result status.
-  - `security`: RBAC trimming, access denial events.
-  - `error`: Global exception interceptor.
-  - `soft-deleted`/`restored`/`hard-deleted`: Mutation record tracking.
-- **Non-Blocking**: Emissions use microtask queues to ensure zero impact on core database transaction latency.
+  - `execution`: Performance tracking, trace IDs, and result status.
+  - `security`: RBAC field trimming and access denial audits.
+  - `error`: Centralized failure reporting for the entire pipeline.
+  - `soft-deleted`/`restored`/`hard-deleted`: Tracking physical data changes for audit logs.
+- **Observability**: Every operation is wrapped in an `ExecutionContext` that propagates a unique `traceId` through all logs and events.
 
 ## 8. Service Communication Patterns
 As a library, communication is primarily synchronous function invocation. Asynchronous patterns are utilized exclusively for physical database I/O (`Promises` over Drizzle async executors).

@@ -4,6 +4,7 @@ import { buildSearchQueries, hydrateResults, buildExistsCondition } from "../que
 import { isMutated } from "../helper";
 import { MutationError } from "../errors";
 import type { ExecutionContext } from "../types/context";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Executes a batch mutation (Many) with race-condition protection.
@@ -27,6 +28,7 @@ export async function executeBatchMutation(
 
   // STRATEGY A: PostgreSQL / SQLite (Efficient .returning() + Transaction for BUG-3)
   if (supportsReturning(db)) {
+    logger.debug(`Using RETURNING strategy for batch mutation on ${baseTableName}`);
     return await db.transaction(async (tx: any) => {
       try {
         // let whereAst;
@@ -52,12 +54,18 @@ export async function executeBatchMutation(
           );
           const rawRows = await mainQuery;
           preHydratedData = hydrateResults(rawRows, baseTableName, metadata, pkName, paths);
-          if (preHydratedData.length === 0) return [];
+          if (preHydratedData.length === 0) {
+            logger.debug(`No records found for pre-hydration with filter. skipping mutation.`);
+            return [];
+          }
         }
 
         const result = await mutationFn(tx, whereAst);
         
-        if (!isMutated(result)) return [];
+        if (!isMutated(result)) {
+          logger.debug(`No records were mutated. skipping hydration.`);
+          return [];
+        }
         if (hydrateBefore) return preHydratedData;
 
         const affectedFilter = Array.isArray(result) ? { [pkName]: { $inArray: result } } : searchFilter;
@@ -82,6 +90,7 @@ export async function executeBatchMutation(
   }
 
   // STRATEGY B: Universal Fallback (Temporary Table for scale and atomicity)
+  logger.debug(`Using Temporary Table fallback strategy for batch mutation on ${baseTableName}`);
   return await db.transaction(async (tx: any) => {
     const tempTableName = generateTempTableName();
     const tempTableIdent = sql.identifier(tempTableName);
@@ -139,6 +148,7 @@ export async function executeBatchMutation(
       const result = await mutationFn(tx, existsCondition);
 
       if (!isMutated(result)) {
+        logger.debug(`No records were mutated. skipping hydration.`);
         return [];
       }
 

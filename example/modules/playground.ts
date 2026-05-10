@@ -35,7 +35,7 @@ export async function playground() {
   }
 
   // Test Hydrator Prototype Pollution directly
-  const { hydrateResults } = require("../src/query-parser/hydrator");
+  const { hydrateResults } = require("../../src/query-parser/hydrator");
   try {
     const maliciousRow = { users: { "persona.__proto__.polluted": "yes" } };
     hydrateResults([maliciousRow], "users", schemaMetadata.metadata);
@@ -117,188 +117,82 @@ export async function playground() {
       console.error("❌ FAIL: Unexpected error occurred:", error.message);
     }
   }
-  console.log("--------------------------------------------------\n");
 
-  // // 1. Check data from database (seeded with numeric strings)
-  // const users = await userRepo.searchPage({
-  //   pageSize: 5,
-  // }, "admin");
+  console.log("\n--- [EDGE CASE] Testing Global Policy & Telemetry ---");
+  
+  // 1. Subscribe to all telemetry events for verification
+  const eventsCaptured: string[] = [];
+  schemaMetadata.subscribeToTelemetry((ctx) => {
+    // Legacy telemetry test
+    eventsCaptured.push(`legacy:${ctx.action}`);
+  });
 
-  // console.log("\n[Test 1] Verifying seeded numeric strings in users table:");
-  // users.data.forEach(user => {
-  //   const zipType = typeof user.zipCode;
-  //   const sidType = typeof user.stringId;
+  // Access the builder from helper to register 'mitt' events
+  const { schemaMetadataBuilder } = require("./helper");
+  
+  schemaMetadataBuilder.on("execution", (ev: any) => {
+    console.log(`[Telemetry Event] Execution: ${ev.action} on ${ev.tableName} status: ${ev.status} (${ev.duration.toFixed(2)}ms)`);
+    eventsCaptured.push(`mitt:execution:${ev.action}`);
+  });
 
-  //   console.log(`User ID: ${user.id}`);
-  //   console.log(` - zipCode: "${user.zipCode}" (type: ${zipType}) -> ${zipType === 'string' ? '✅ PASS' : '❌ FAIL'}`);
-  //   console.log(` - stringId: "${user.stringId}" (type: ${sidType}) -> ${sidType === 'string' ? '✅ PASS' : '❌ FAIL'}`);
-  // });
+  schemaMetadataBuilder.on("security", (ev: any) => {
+    console.log(`[Telemetry Event] Security: ${ev.type} on ${ev.tableName} - ${ev.message}`);
+    eventsCaptured.push(`mitt:security:${ev.type}`);
+  });
 
-  // // 2. Deep Edge Case Test (Manual Data Simulation)
-  // // We simulate what Drizzle returns from SQLite for JSON columns or dot-notation fields
-  // console.log("\n[Test 2] Manual Hydration Edge Cases:");
+  schemaMetadataBuilder.on("soft-deleted", (ev: any) => {
+    console.log(`[Telemetry Event] Mutation: ${ev.action} on ${ev.tableName} - Records: ${ev.records.length}`);
+    eventsCaptured.push(`mitt:mutation:${ev.action}`);
+  });
 
-  // // We'll use the repo's internal hydrator indirectly by searching with custom filters
-  // // or just mocking a raw row if we could access the hydrator.
-  // // Since we want to be thorough, let's create a temporary user with specific "dangerous" values.
+  // 2. Test RBAC Trimming via Telemetry
+  console.log("\n[Sub-Test] Triggering RBAC Field Trimming...");
+  // Use 'public' profile which is configured in helper.ts to only allow 'name' projection
+  try {
+    await userRepo.searchMany({
+      projection: ["id", "name", "email", "secret_field"] as any,
+    }, "public");
+  } catch (e: any) {
+    console.log(`[Info] Trimming resulted in: ${e.message}`);
+  }
 
-  // const dangerousUser = await userRepo.createOne({
-  //   name: "Edge Case User",
-  //   email: `edge.${Date.now()}@test.com`,
-  //   zipCode: "00123",        // Numeric string with leading zero
-  //   stringId: "true",        // Boolean-like string
-  //   occupational: {
-  //     position: "false",    // Nested boolean-like string
-  //     company: "Test Inc",
-  //     period: { start: new Date(), end: new Date() }
-  //   },
-  //   persona: {
-  //     hobbies: ["coding"],
-  //     skills: ["null", "123", "{\"nested\": \"ok\"}"] as any, // Mixed array
-  //   },
-  // }, "admin");
+  // 3. Test Mutation Events (Soft Delete)
+  console.log("\n[Sub-Test] Triggering Mutation Events...");
+  try {
+    const tempUser = await userRepo.createOne({
+      name: "Telemetry Test",
+      email: `telemetry.${Date.now()}@example.com`,
+    }, "admin");
+    
+    await userRepo.softDeleteOne(tempUser.id, "admin");
+    await userRepo.restoreOne(tempUser.id, "admin");
+    await userRepo.hardDeleteOne(tempUser.id, "admin");
+  } catch (e: any) {
+    console.error(`[Error] Mutation tests failed: ${e.message}`);
+  }
 
-  // const fetched = await userRepo.searchOne({
-  //   filter: { id: { $eq: dangerousUser.id } }
-  // }, "admin");
+  // 4. Test Global Policy Fallback
+  console.log("\n[Sub-Test] Testing Global Policy Fallback...");
+  const postRepo = schemaMetadata.repoFactory("posts");
+  // Posts doesn't have a specific policy in helper.ts, so it should hit the global fallback
+  
+  try {
+    await postRepo.searchOne({}, "guest");
+    console.log("✅ PASS: Global Policy handled guest access to posts.");
+  } catch (e: any) {
+    console.log(`❌ FAIL: Global Policy failed for posts (guest): ${e.message}`);
+  }
 
-  // if (fetched) {
-  //   console.log("Checking Dangerous User Results:");
+  // Final Verification
+  await new Promise(resolve => setTimeout(resolve, 200)); // Wait for async telemetry
+  console.log("\nSummary of Captured Events:");
+  eventsCaptured.forEach(e => console.log(` - ${e}`));
 
-  //   const checks = [
-  //     { label: "Leading zero string (00123)", value: fetched.zipCode, expected: "string" },
-  //     { label: "Boolean string (true)", value: fetched.stringId, expected: "string" },
-  //     { label: "Nested boolean string (false)", value: fetched.occupational?.position, expected: "string" },
-  //     { label: "Array element 'null'", value: fetched.persona?.skills?.[0], expected: "string" },
-  //     { label: "Array element '123'", value: fetched.persona?.skills?.[1], expected: "string" },
-  //     { label: "Array element '{\"nested\": \"ok\"}' (Should remain string)", value: fetched.persona?.skills?.[2], expected: "string" },
-  //     { label: "Whole JSON Object (persona)", value: fetched.persona, expected: "object" },
-  //   ];
-
-  //   checks.forEach(c => {
-  //     const actualType = typeof c.value;
-  //     const pass = actualType === c.expected;
-  //     console.log(` - ${c.label}: "${JSON.stringify(c.value)}" (type: ${actualType}) -> ${pass ? '✅ PASS' : '❌ FAIL'}`);
-  //   });
-  // }
-
-  // // Cleanup
-  // await userRepo.hardDeleteOne(dangerousUser.id, "admin");
-
-  // // 3. BUG-1 (SQL Injection) Security Check
-  // console.log("\n[Test 3] BUG-1 (SQL Injection) Security Check:");
-
-  // const injectionVectors = [
-  //   {
-  //     label: "Classic Breakout",
-  //     key: "profile.bio'), '$.x', 'y'); DROP TABLE users; --"
-  //   },
-  //   {
-  //     label: "Comment Injection",
-  //     key: "settings.theme' --"
-  //   },
-  //   {
-  //     label: "Function Call",
-  //     key: "occupational.position[0].(SELECT 'secret')"
-  //   },
-  //   {
-  //     label: "Invalid Symbol",
-  //     key: "persona.skills!"
-  //   }
-  // ];
-
-  // for (const vector of injectionVectors) {
-  //   try {
-  //     // Note: We use any here because TypeScript would block these keys if we had strict types,
-  //     // but in a real-world API scenario, these arrive as untyped JSON.
-  //     await userRepo.updateOne(1, { [vector.key]: "hacker" } as any, "admin");
-  //     console.log(`❌ FAIL: ${vector.label} reached the database!`);
-  //   } catch (e: any) {
-  //     const isSecurityError = e.message.includes("Security Error");
-  //     console.log(`✅ PASS: ${vector.label} blocked. ${isSecurityError ? '(Type: Security Error)' : '(Type: Other Error)'}`);
-  //   }
-  // }
-
-  // // Ensure valid paths still work
-  // try {
-  //   const validKey = "occupational.position";
-  //   await userRepo.updateOne(1, { [validKey]: "Developer" } as any, "admin");
-  //   console.log("✅ PASS: Valid nested path works normally.");
-  // } catch (e: any) {
-  //   console.log(`❌ FAIL: Valid path was blocked: ${e.message}`);
-  // }
-
-  // // 4. BUG-3 (Nested Join Logic) Check
-  // console.log("\n[Test 4] BUG-3 (Nested Join Logic) Check:");
-  // const groupRepo = schemaMetadata.repoFactory("groups", {});
-
-  // try {
-  //   // 3 Levels deep: groups -> users -> posts -> comments
-  //   const results = await groupRepo.searchMany({
-  //     limit: 1,
-  //     projection: [
-  //       "name",
-  //       "users.name",
-  //       "users.posts.title",
-  //       "users.posts.comments.content"
-  //     ],
-  //   }, "admin");
-
-  //   console.log(`✅ PASS: Successfully executed 3-level deep nested join.`);
-  //   if (results.length > 0) {
-  //     const group = results[0];
-  //     const user = group.users?.[0];
-  //     const post = user?.posts?.[0];
-  //     const comment = post?.comments?.[0];
-
-  //     console.log(`Structure Check:`);
-  //     console.log(` - Group: ${group.name}`);
-  //     console.log(` - User: ${user?.name || 'N/A'}`);
-  //     console.log(` - Post: ${post?.title ? 'Exists' : 'N/A'}`);
-  //     console.log(` - Comment: ${comment?.content ? 'Exists' : 'N/A'}`);
-  //   }
-  // } catch (e: any) {
-  //   console.log(`❌ FAIL: Nested join failed. Error: ${e.message}`);
-  // }
-
-  // // 5. Level 5 Stress Test
-  // console.log("\n[Test 5] 5-Level Deep Nested Join Check:");
-  // try {
-  //   // Chain: Groups -> Users -> Posts -> Comments -> Author (User) -> Profile
-  //   const deepResults = await groupRepo.searchMany({
-  //     limit: 1,
-  //     projection: [
-  //       "name",
-  //       "users.name",
-  //       "users.posts.title",
-  //       "users.posts.comments.content",
-  //       "users.posts.comments.author.name",
-  //       "users.posts.comments.author.profile.bio"
-  //     ],
-  //     order: {
-  //       'users.posts.comments.createdAt': {
-  //         'aggregate': 'avg',
-  //         direction: 'desc',
-  //         'nulls': 'first'
-  //       }
-  //     }
-  //   }, "admin");
-
-  //   console.log(`✅ PASS: Successfully executed 5-level deep nested join.`);
-  //   if (deepResults.length > 0) {
-  //     const group = deepResults[0];
-  //     const comment = group.users?.[0]?.posts?.[0]?.comments?.[0];
-  //     const author = comment?.author;
-  //     const profile = author?.profile;
-
-  //     console.log(`Deep Structure Check:`);
-  //     console.log(` - Group: ${group.name}`);
-  //     console.log(` - Comment Author: ${author?.name || 'N/A'}`);
-  //     console.log(` - Author Profile Bio: ${profile?.bio ? 'Exists' : 'N/A'}`);
-  //   }
-  // } catch (e: any) {
-  //   console.log(`❌ FAIL: 5-level nested join failed. Error: ${e.message}`);
-  // }
+  if (eventsCaptured.some(e => e.includes("mitt:security:field_trim"))) {
+    console.log("\n✅ FINAL PASS: Telemetry system accurately captured security events.");
+  } else {
+    console.error("\n❌ FINAL FAIL: Telemetry system missed security events.");
+  }
 
   console.log("\n--- Playground Test Finished ---");
 }

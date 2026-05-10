@@ -1,9 +1,14 @@
-import { expect, test, describe } from "bun:test";
+import { expect, test, describe, beforeEach } from "bun:test";
 import { buildSearchQueries, isFilterSimple, buildExistsCondition } from "../../../src/query-parser/filter-builder";
 import { TableNotFoundError } from "../../../src/errors";
 import { pgTable, serial, text } from "drizzle-orm/pg-core";
+import { clearResolutionCache } from "../../../src/query-parser/metadata-explorer";
 
 describe("Query Parser: filter-builder", () => {
+  beforeEach(() => {
+    clearResolutionCache();
+  });
+
   const users = pgTable("users", {
     id: serial("id").primaryKey(),
     name: text("name"),

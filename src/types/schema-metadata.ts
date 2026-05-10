@@ -11,6 +11,7 @@ import type { AnyD1Database } from "drizzle-orm/d1";
 import type { Emitter } from "mitt";
 import type { CastorEvents } from "./telemetry";
 import type { TableConfig } from "./hook";
+import type { ILogger } from "./logger";
 
 export type AnyDatabase =
   | BunSQLiteDatabase
@@ -93,6 +94,7 @@ export type TTranslatorContext<
   baseTableName: TTableNames<TDb, TTables, TMetadata>;
   telemetrySubscribers?: Set<(ctx: any) => void | Promise<void>>;
   emitter?: Emitter<CastorEvents>;
+  logger?: ILogger;
 };
 
 export type TStrictSchemaMetadata<

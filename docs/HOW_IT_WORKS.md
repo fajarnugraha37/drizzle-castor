@@ -121,22 +121,34 @@ Before any payload hits the translation layer or executor, it passes through the
 
 ## 4. Telemetry & Logging
 
-`drizzle-castor` provides an industry-standard, event-driven telemetry system using the **`mitt`** library.
+`drizzle-castor` provides an industry-standard observability through: an internal **Pattern-Based Logger** and an external **Event-Driven Telemetry** bus.
 
-### Event-Driven Architecture
-Instead of hardcoded `console` logs, the library emits structured events that developers can subscribe to via the `SchemaBuilder`.
+### A. Internal Hybrid Logging (Pino)
+The library uses **`pino`** for high-performance logging, configured via `builder.withLogger()`.
 
-- **Asynchronous Emission**: All events are emitted via the microtask queue (`Promise.resolve().then()`), ensuring that logging logic never blocks the database transaction or adds latency to the response.
+- **Pattern Formatting**: Supports Quarkus-style symbols:
+  - `%d{format}`: Datetime (e.g., `%d{yyyy-MM-dd HH:mm:ss}`).
+  - `%p`: Log level (INFO, DEBUG, etc.).
+  - `%c`: Category (e.g., `castor.core`).
+  - `%t`: Unique `traceId` from the execution context.
+  - `%s`: The log message.
+  - `%{key.path}`: Context injection. Automatically extracts values from the current `ExecutionContext` using dot-notation (e.g., `%{params.projection[0]}`).
+- **Context Awareness**: Every log entry automatically carries the `traceId`, ensuring that log streams from concurrent requests can be correlated easily.
+
+### B. Event-Driven Telemetry (Mitt)
+Structured events are emitted via an asynchronous bus, allowing developers to hook into the library lifecycle without performance overhead.
+
+- **Asynchronous Emission**: All events are emitted via microtask scheduling, ensuring that telemetry logic never blocks core database transactions.
 - **Event Categories**:
-  - `execution`: Triggered after every repository action. Contains `tableName`, `action`, `duration`, `status`, and `traceId`.
+  - `execution`: Triggered after every action. Contains `tableName`, `action`, `duration`, `status`, and `traceId`.
   - `security`: Triggered when RBAC trims fields or denies access.
-  - `error`: Triggered for all unhandled exceptions within the pipeline.
-  - `soft-deleted` / `restored` / `hard-deleted`: Triggered after successful mutations, carrying the primary keys or full records for audit logs.
+  - `error`: Centralized failure reporting for all unhandled exceptions.
+  - `soft-deleted` / `restored` / `hard-deleted`: Physical data mutation tracking for audit trails.
 
-### Usage Example
+#### Subscription Example
 ```typescript
 builder.on('execution', (ev) => {
-  console.log(`[${ev.traceId}] ${ev.action} on ${ev.tableName} took ${ev.duration}ms`);
+  metrics.histogram('db_latency', ev.duration, { table: ev.tableName, action: ev.action });
 });
 ```
 

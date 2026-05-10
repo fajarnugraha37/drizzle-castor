@@ -156,7 +156,7 @@ async function playground() {
   console.log("JSON Array Extraction Result:", JSON.stringify(jsonArrayResult, null, 2));
 
   console.log("\n--- Testing RBAC Trimming ---");
-  const trimmedRepo = builder.repoFactory("users");
+  const trimmedRepo = builder.repoFactory("users", {});
 
   const trimmedQuery = await trimmedRepo.searchMany({
     projection: ["name", "persona"],
@@ -168,5 +168,6 @@ async function playground() {
 
   console.log("Trimmed Query Executed.");
 
-  console.log("\n--- Playground Test Finished ---");
-}
+  console.log("\n--- Running Extended Playground ---");
+  await (await import("./modules/playground")).playground();
+  }

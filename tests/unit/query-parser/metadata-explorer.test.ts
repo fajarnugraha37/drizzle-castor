@@ -1,8 +1,12 @@
-import { expect, test, describe } from "bun:test";
-import { findRelationDefinition, isRelation, resolvePathSegments, resolveRelationPath } from "../../../src/query-parser/metadata-explorer";
+import { expect, test, describe, beforeEach } from "bun:test";
+import { findRelationDefinition, isRelation, resolvePathSegments, resolveRelationPath, clearResolutionCache } from "../../../src/query-parser/metadata-explorer";
 import { QueryParsingError } from "../../../src/errors";
 
 describe("Query Parser: Metadata Explorer", () => {
+  beforeEach(() => {
+    clearResolutionCache();
+  });
+
   const mockMetadata = {
     users: {
       oneToMany: [{ relationName: "posts", relatedTable: "posts" }],

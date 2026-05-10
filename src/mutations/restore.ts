@@ -4,6 +4,7 @@ import { executeBatchMutation } from "./batch-executor";
 import { executeSingleMutation } from "./single-executor";
 import { supportsReturning } from "../helper/dialect-helper";
 import type { ExecutionContext } from "../types/context";
+import { logger } from "../helper/logger-helper";
 
 export async function executeRestoreOne(
   ctx: ExecutionContext<any, any>,
@@ -11,6 +12,7 @@ export async function executeRestoreOne(
 ): Promise<boolean> {
   const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
+  logger.debug(`Executing restoreOne for ${baseTableName} with ID ${params.id}`);
   const config = getSoftDeleteConfig(metadata, baseTableName);
   const pkName = getPrimaryKeyColumnName(baseTable);
   const pkColumn = baseTable[pkName];
@@ -71,6 +73,7 @@ export async function executeRestoreMany(
 ): Promise<number> {
   const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
+  logger.debug(`Executing restoreMany for ${baseTableName}`);
   const config = getSoftDeleteConfig(metadata, baseTableName);
   const pkName = getPrimaryKeyColumnName(baseTable);
   const pkColumn = baseTable[pkName];

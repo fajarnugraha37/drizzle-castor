@@ -4,6 +4,7 @@ import { buildSearchQueries, hydrateResults, buildExistsCondition } from "../que
 import { isMutated } from "../helper";
 import { MutationError } from "../errors";
 import type { ExecutionContext } from "../types/context";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Executes a single record mutation (One) with race-condition protection.
@@ -30,6 +31,7 @@ export async function executeSingleMutation(
 
   // STRATEGY A: PostgreSQL / SQLite (Efficient .returning() + Transaction for BUG-3)
   if (supportsReturning(db)) {
+    logger.debug(`Using RETURNING strategy for single mutation on ${baseTableName} (ID: ${idValue})`);
     return await db.transaction(async (tx: any) => {
       try {
         // let whereAst;
@@ -90,6 +92,7 @@ export async function executeSingleMutation(
   }
 
   // STRATEGY B: Universal Fallback (Temporary Table for 100% security)
+  logger.debug(`Using Temporary Table fallback strategy for single mutation on ${baseTableName} (ID: ${idValue})`);
   return await db.transaction(async (tx: any) => {
     const tempTableName = generateTempTableName();
     const tempTableIdent = sql.identifier(tempTableName);

@@ -3,6 +3,7 @@ import { resolvePathSegments, resolveRelationPath } from "./metadata-explorer";
 import { buildJsonExtractionSql } from "./json-resolver";
 import type { AliasMap, AnyTable } from "../types";
 import { TableNotFoundError, AliasNotFoundError, ColumnNotFoundError } from "../errors";
+import { logger } from "../helper/logger-helper";
 
 
 /**
@@ -60,6 +61,7 @@ export function getColumn(
   baseTableName: string,
   db: any,
 ): any {
+  logger.trace(`Resolving column for path: ${path}`);
   const resolution = resolvePathSegments(metadata, baseTableName, path);
   
   let targetTable: any = baseTable;

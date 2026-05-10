@@ -117,5 +117,67 @@ const builder = createSchemaBuilder(db, [usersTable, postsTable] as const);
 // TTableName is strictly typed to "users" | "posts"
 const userRepo = builder.build().repoFactory("users");
 ```
-
+// ...
 Because `userRepo` is instantiated with the literal `"users"`, all repository methods (`createOne`, `searchMany`, `updateMany`) are permanently bound to the `UserEntity` type and its valid relational paths, securing the entire API surface from end to end.
+
+---
+
+## 6. Telemetry & Event Types
+
+We use a strictly typed event bus via `mitt`. Every event payload is defined to ensure that subscribers can safely access metadata, performance metrics, and mutation records.
+
+```typescript
+type TelemetryEvents = {
+  execution: ExecutionEvent;   // Latency, status, traceId
+  security: SecurityEvent;     // Audit logs for field trimming
+  error: ErrorEvent;           // Global exception details
+  "soft-deleted": MutationEvent; // Records affected by soft-delete
+  "restored": MutationEvent;     // Records affected by restore
+  "hard-deleted": MutationEvent; // Records affected by permanent delete
+};
+```
+
+Subscribing is type-safe:
+```typescript
+builder.on('execution', (ev) => {
+  ev.duration; // inferred as number
+  ev.action;   // inferred as "read" | "create" | ...
+});
+```
+
+---
+
+## 7. Hybrid RBAC & Global Policy Types
+
+The policy system supports both static maps and dynamic callbacks. TypeScript ensures that your profile names are consistent throughout the application.
+
+```typescript
+// Define valid profiles once
+builder.profiles(['admin', 'guest'] as const);
+
+// Policy definitions are now checked against those profiles
+builder.policies('users', {
+  admin: { allowedActions: "*" }, // Valid
+  super: { ... } // Error: "super" is not in ['admin', 'guest']
+});
+```
+
+The `UnifiedPolicyConfig` supports:
+- **Declarative**: `Record<TProfile, PolicyDefinition>`
+- **Imperative**: `(ctx) => PolicyDefinition | Promise<PolicyDefinition>`
+- **Global**: `(ctx, table, profiles) => PolicyDefinition`
+
+---
+
+## 8. Logger Configuration Types
+
+The internal logger configuration allows for Quarkus-style pattern strings and log levels.
+
+```typescript
+type LogLevel = "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" | "FATAL" | "OFF";
+
+interface LoggerConfig {
+  level?: LogLevel;
+  pattern?: string; // e.g., "%d %p [%c] (%t) %s"
+}
+```

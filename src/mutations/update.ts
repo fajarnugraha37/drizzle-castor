@@ -4,6 +4,7 @@ import { executeBatchMutation } from "./batch-executor";
 import { executeSingleMutation } from "./single-executor";
 import { supportsReturning } from "../helper/dialect-helper";
 import type { ExecutionContext } from "../types/context";
+import { logger } from "../helper/logger-helper";
 
 export async function executeUpdateOne(
   ctx: ExecutionContext<any, any>,
@@ -11,10 +12,14 @@ export async function executeUpdateOne(
 ) {
   const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
+  logger.debug(`Executing updateOne for ${baseTableName} with ID ${params.id}`);
   const pkName = getPrimaryKeyColumnName(baseTable);
   const pkColumn = baseTable[pkName];
 
-  if (!params.id || !params.set) return null;
+  if (!params.id || !params.set) {
+    logger.trace(`Missing required parameters for updateOne. ID: ${params.id}, Set: ${JSON.stringify(Object.keys(params.set || {}))}`);
+    return null;
+  }
 
   const parsedSetParams = parseUpdateSet(db, baseTable, params.set);
 
@@ -53,10 +58,14 @@ export async function executeUpdateMany(
 ) {
   const { params, translatorContext } = ctx;
   const { db, metadata, baseTableName } = translatorContext;
+  logger.debug(`Executing updateMany for ${baseTableName}`);
   const pkName = getPrimaryKeyColumnName(baseTable);
   const pkColumn = baseTable[pkName];
 
-  if (!params.set) return [];
+  if (!params.set) {
+    logger.trace(`Missing required parameters for updateMany. Set: ${JSON.stringify(Object.keys(params.set || {}))}`);
+    return [];
+  }
 
   const parsedSetParams = parseUpdateSet(db, baseTable, params.set);
 

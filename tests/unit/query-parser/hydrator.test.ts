@@ -1,8 +1,13 @@
-import { expect, test, describe } from "bun:test";
+import { expect, test, describe, beforeEach } from "bun:test";
 import { hydrateResults } from "../../../src/query-parser/hydrator";
 import { pgTable, serial, text, json } from "drizzle-orm/pg-core";
+import { clearResolutionCache } from "../../../src/query-parser/metadata-explorer";
 
 describe("Query Parser: Hydrator", () => {
+  beforeEach(() => {
+    clearResolutionCache();
+  });
+
   // Use real Drizzle tables for reliable metadata
   const usersTable = pgTable("users", {
     id: serial("id").primaryKey(),

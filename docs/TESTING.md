@@ -52,13 +52,21 @@ The `package.json` provides specific scripts for executing different test suites
 ### A. Unit Tests
 Runs the isolated test suite using Bun. This is fast and should be run continuously during development.
 
+**Best Practice:** Always use the `--isolate` flag when running the full suite to prevent side-effects from global state (like the metadata resolution cache) leaking between test files.
+
 ```bash
-# Run all unit tests
-bun run test
+# Run all unit tests with isolation
+bun test --isolate
 
 # Run unit tests in watch mode
 bun run test:watch
 ```
+
+#### What to Test
+- **AST Compiler**: Verify that JSON payloads translate to correct SQL snippets.
+- **Middleware**: Ensure policies are applied, fields are trimmed, and `next()` is called appropriately.
+- **Telemetry**: Assert that `execution`, `security`, and `error` events are emitted with the expected payloads.
+- **Logger**: Verify that custom patterns are correctly formatted and context is injected.
 
 ### B. Integration Tests (SQLite)
 Runs the SQLite integration tests. These are executed by Bun using its blazing-fast, built-in in-memory SQLite driver (`bun:sqlite`).

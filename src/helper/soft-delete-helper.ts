@@ -1,4 +1,5 @@
 import type { SoftDeleteConfig } from "../types";
+import { logger } from "./logger-helper";
 
 /**
  * Checks if an object is a Promise/thenable.
@@ -37,6 +38,7 @@ export async function injectSoftDeleteFilter(query: any, metadata: any, tableNam
   const config = metadata[tableName]?.softDelete as SoftDeleteConfig<any>;
   if (!config || !config.deleteValue) return query; // If no soft delete config, do nothing
 
+  logger.debug(`Injecting soft-delete filter for table: ${tableName} (mode: ${mode})`);
   const softFilterConditions: any[] = [];
   const resolvedDelete = await resolveProviderValues(config.deleteValue);
   

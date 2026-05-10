@@ -3,7 +3,7 @@ import { Cache } from "@stacksjs/ts-cache";
 import { QueryParsingError } from "../errors";
 import type { PathResolution, RelationNode, RelationType } from "../types";
 
-const resolutionCache = new Cache({
+export const resolutionCache = new Cache({
   stdTTL: 600,
   maxKeys: 5000,
   checkPeriod: 60,
@@ -13,6 +13,14 @@ const resolutionCache = new Cache({
   enableStats: false,
   enableEvents: false,
 });
+
+/**
+ * Clears the internal resolution cache.
+ * Useful for testing scenarios where metadata might change dynamically.
+ */
+export function clearResolutionCache(): void {
+  resolutionCache.flushAll();
+}
 
 /**
  * Traverses the metadata to find the relation definition for a given relation name.

@@ -1,7 +1,7 @@
 <h1 align="center">
   <a href="https://github.com/fajarnugraha37/drizzle-castor">
     <picture>
-      <img height="500" alt="Drizzle Castor" src="https://raw.githubusercontent.com/fajarnugraha37drizzle-castor/refs/heads/main/docs/logo-001.png">
+      <img height="500" alt="Drizzle Castor" src="https://raw.githubusercontent.com/fajarnugraha37drizzle-castor/refs/heads/main/docs/drizzle-castor.png">
     </picture>
   </a>
 </h1>
@@ -25,12 +25,11 @@
 ## Features
 
 - **JSON-Based Querying (AST Translation)**: Filter, sort, and project relational data using intuitive JSON payloads (e.g., `{ filter: { "posts.title": { $like: "%Drizzle%" } } }`).
-- **Unified RBAC**: Built-in, middleware-driven Role-Based Access Control. Secure operations at the action and field levels (Intelligent Data Trimming).
+- **Unified RBAC Engine**: Built-in, middleware-driven Role-Based Access Control. Secure operations at the action and field levels (Intelligent Data Trimming) with support for **Declarative** (Map) and **Imperative** (Async Callbacks) policies.
 - **Unified Middleware Pipeline**: Adopts the **Koa-style Onion Model** for absolute control flow (`await next()`) on every request.
-- **Unified RBAC Policies**: Secure operations at the action and field levels with support for both **Declarative** (Object Map) and **Imperative** (Sync/Async Callbacks) definitions.
-- **Telemetry**: Event-driven logging system using **`mitt`**. Emits structured events for execution performance, security audit trails, and data mutations.
+- **Event-Driven Telemetry**: Integrated system using **`mitt`**. Emits structured, non-blocking events for execution performance, security audits, and data mutations.
+- **Hybrid Logging**: Quarkus-style pattern-based logging powered by **`pino`**. Supports context injection (traceId, parameters) and nested object traversal in log patterns.
 - **Dialect Agnostic**: Supports PostgreSQL, MySQL, and SQLite. Handles complex dialect-specific logic under the hood (e.g., `RETURNING` clauses vs. Temporary Tables for atomic mutations).
-- **Unified RBAC**: Built-in, middleware-driven Role-Based Access Control. Secure operations at the action and field levels (Data Trimming).
 - **Native Soft Deletes**: Declarative soft-delete capabilities that implicitly apply safety filters to queries and joins.
 - **Safe Pagination (Split Queries)**: Leverages Common Table Expressions (CTEs) to prevent Cartesian fan-out when paginating one-to-many or many-to-many relationships.
 
@@ -41,6 +40,8 @@
 - **Language**: [TypeScript](https://www.typescriptlang.org/)
 - **Runtime**: [Bun](https://bun.sh/) & Node.js
 - **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
+- **Logging**: [Pino](https://getpino.io/)
+- **Event Bus**: [Mitt](https://github.com/developit/mitt)
 - **Validation/Typing**: [Zod](https://zod.dev/)
 - **Testing**: Bun Test, Node Test Runner, [Testcontainers](https://testcontainers.com/) (for integration tests)
 
@@ -84,17 +85,24 @@ const db = drizzle("sqlite.db");
 
 // 1. Initialize Builder
 const builder = createSchemaBuilder(db, [usersTable] as const, "strict")
-  .profiles(['admin'])
+  .profiles(['admin', 'user'] as const) // Define valid profiles for type-safety
+  .withLogger({ level: 'DEBUG', pattern: '%d [%p] (%t) %s' }) // Configure Hybrid Logger
   .policies('users', {
-    admin: { allowedActions: "*", allowedSets: "*", allowedProjections: "*", allowedFilters: "*" }
+    admin: { allowedActions: "*", allowedProjections: "*", allowedFilters: "*" },
+    user: async (ctx) => ({ allowedActions: ["read"], allowedProjections: ["name"] }) // Imperative policy
   });
+
+// 2. Subscribe to Telemetry
+builder.on('execution', (ev) => {
+  console.log(`${ev.action} on ${ev.tableName} took ${ev.duration}ms`);
+});
 
 const metadata = builder.build();
 
-// 2. Create Repository
+// 3. Create Repository
 const userRepo = metadata.repoFactory("users");
 
-// 3. Execute Type-Safe Queries
+// 4. Execute Type-Safe Queries
 const results = await userRepo.searchMany({
   filter: { "name": { $eq: "John Doe" } }
 }, "admin");

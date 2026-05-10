@@ -6,6 +6,7 @@ import { buildJsonExtractionSql } from "./json-resolver";
 import { getDialect, getPrimaryKeyColumnName } from "../helper";
 import type { AliasMap, AnyDatabase } from "../types";
 import { AliasNotFoundError, QueryParsingError, SecurityError, TableNotFoundError } from "../errors";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Builds a specific selection object for Drizzle to only select requested columns.
@@ -109,6 +110,7 @@ export function applyJoins(
   let currentQb = qb;
 
   for (const path of sortedPaths) {
+    logger.debug(`Applying join for path: ${path}`);
     const nodes = resolveRelationPath(metadata, baseTableName, path);
     const lastNode = nodes[nodes.length - 1];
     const aliased = aliasMap.get(path);
@@ -228,6 +230,8 @@ export function parseFilter(
   db: AnyDatabase,
 ): SQL | undefined {
   if (!filter || typeof filter !== "object") return undefined;
+
+  logger.trace(`Parsing filter for ${baseTableName}:`, filter);
 
   const conditions: (SQL | undefined)[] = [];
 

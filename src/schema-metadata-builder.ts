@@ -1,6 +1,7 @@
 import mitt from "mitt";
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition, CastorEvents } from "./types";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition, CastorEvents, LoggerConfig } from "./types";
+import { logger } from "./helper/logger-helper";
 
 export class SchemaBuilder<
   TDb extends AnyDatabase,
@@ -12,6 +13,7 @@ export class SchemaBuilder<
   private registeredProfiles: string[] = ["default"];
   private registeredPolicies: Map<string, PolicyDefinition<any, any, any>> = new Map();
   private globalPolicy?: GlobalPolicyDefinition<any, any>;
+  private loggerConfig: LoggerConfig = { level: "WARN" };
   private isThrowError: boolean = false;
   private traceIdGenerator?: TraceIdGenerator;
   private emitter = mitt<CastorEvents>();
@@ -34,6 +36,7 @@ export class SchemaBuilder<
     newBuilder.registeredProfiles = [...profiles];
     newBuilder.registeredPolicies = new Map(this.registeredPolicies);
     newBuilder.globalPolicy = this.globalPolicy;
+    newBuilder.loggerConfig = this.loggerConfig;
     newBuilder.isThrowError = this.isThrowError;
     newBuilder.traceIdGenerator = this.traceIdGenerator;
     newBuilder.emitter = this.emitter;
@@ -86,6 +89,7 @@ export class SchemaBuilder<
     TName extends TableName<TTables[number]>,
     const TConfig extends TSchemaMetadata<TDb, TTables>[TName],
   >(tableName: TName, config: TConfig): SchemaBuilder<TDb, TTables, TMetadata & { [K in TName]: TConfig }, TProfiles> {
+    logger.debug(`Registering table metadata for '${tableName as string}'`);
     const metadataWithNewTable = {
       ...this.metadata,
       [tableName]: config,
@@ -100,12 +104,21 @@ export class SchemaBuilder<
     newBuilder.registeredProfiles = [...this.registeredProfiles];
     newBuilder.registeredPolicies = new Map(this.registeredPolicies);
     newBuilder.globalPolicy = this.globalPolicy;
+    newBuilder.loggerConfig = this.loggerConfig;
     newBuilder.isThrowError = this.isThrowError;
     newBuilder.traceIdGenerator = this.traceIdGenerator;
+    newBuilder.emitter = this.emitter;
     return newBuilder;
   }
 
+  withLogger(config: LoggerConfig): this {
+    this.loggerConfig = config;
+    logger.debug(`Logger configured with level: ${config.level || "WARN"}`);
+    return this;
+  }
+
   build() {
+    logger.info(`Building SchemaMetadata for ${Object.keys(this.metadata).length} tables`);
     const finalMetadata = this.metadata as unknown as TMetadata;
     return defineSchemaMetadata(
       this.db,
@@ -115,6 +128,7 @@ export class SchemaBuilder<
       this.registeredPolicies,
       this.globalPolicy,
       this.emitter,
+      this.loggerConfig,
       this.isThrowError,
       this.traceIdGenerator
     )(finalMetadata);

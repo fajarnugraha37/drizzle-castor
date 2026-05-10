@@ -2,12 +2,14 @@ import { SQL, sql, getTableColumns } from "drizzle-orm";
 import { getTableName } from "drizzle-orm";
 import { assertSafeKey, getDialect } from "../helper";
 import { ColumnNotFoundError, SecurityError } from "../errors";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Validates a JSON path segment for safety against SQL Injection.
  * Permits only alphanumeric, underscore, dots, and array indices.
  */
 function validateJsonPath(path: string): void {
+  logger.trace(`Validating JSON path: ${path}`);
   // Allowlist: letters, numbers, underscores, dots, and square brackets for arrays
   const safePattern = /^[a-zA-Z0-9_.[\]]+$/;
   if (!safePattern.test(path)) {
@@ -39,6 +41,7 @@ export function buildJsonExtractionSql(
   column: SQL | unknown,
   jsonPath: string,
 ): SQL {
+  logger.trace(`Building JSON extraction for path: ${jsonPath}`);
   // Security check for projection paths
   validateJsonPath(jsonPath);
   
@@ -74,6 +77,7 @@ export function parseUpdateSet(
   baseTable: any,
   setParams: Record<string, any>
 ): Record<string, any> {
+  logger.trace("Parsing update set for JSON paths");
   const dialect = getDialect(db);
   const parsedSet: Record<string, any> = {};
   const jsonMutations: Record<string, { path: string; value: any }[]> = Object.create(null);
@@ -85,6 +89,7 @@ export function parseUpdateSet(
       const columnName = key.substring(0, dotIndex);
       const jsonPath = key.substring(dotIndex + 1);
 
+      logger.trace(`Found JSON path in update: ${key}`);
       // Security check for update keys
       validateJsonPath(jsonPath);
 

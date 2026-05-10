@@ -1,6 +1,7 @@
 import { AccessDeniedError } from "../errors";
 import { CONJUNCTION_OPERATORS } from "../types";
 import type { Middleware, PolicyDefinition, UnifiedPolicyConfig } from "../types";
+import { logger } from "../helper/logger-helper";
 
 function isFieldAllowed(field: string, allowedSet: Set<string>): boolean {
   if (allowedSet.has("*")) return true;
@@ -33,7 +34,7 @@ function trimFilterObj(filter: any, allowedSet: Set<string> | "*", ctx?: any): a
       }
     } else if (k.startsWith("$")) {
       const msg = `[RBAC] Discarding unknown reserved keyword in filter: ${k}`;
-      console.warn(msg);
+      logger.warn(msg);
       if (ctx && ctx.state) {
         ctx.state.warnings = ctx.state.warnings || [];
         ctx.state.warnings.push(msg);
@@ -49,7 +50,7 @@ function trimFilterObj(filter: any, allowedSet: Set<string> | "*", ctx?: any): a
         targetFilter[k] = v;
       } else {
         const msg = `[RBAC] Trimming unallowed field in filter: ${k}`;
-        console.warn(msg);
+        logger.warn(msg);
         if (ctx && ctx.state) {
           ctx.state.warnings = ctx.state.warnings || [];
           ctx.state.warnings.push(msg);
@@ -101,7 +102,7 @@ function handleFields(
       });
       throw new AccessDeniedError(msg);
     } else {
-      console.warn(msg);
+      logger.warn(msg);
       if (ctx && ctx.state) {
         ctx.state.warnings = ctx.state.warnings || [];
         ctx.state.warnings.push(msg);

@@ -20,7 +20,22 @@ export const schemaMetadataBuilder = createSchemaBuilder(db, [
   usersTable,
   postsTable,
   profilesTable
-] as const, "lenient"); // Use "strict" to block all actions without an explicit RBAC policy
+] as const, "lenient")
+  .profiles(['default', 'public', 'admin', 'user'] as const) // Define valid profiles
+  .withLogger({ 
+    level: 'INFO', 
+    pattern: '%d{HH:mm:ss} %p [%c] (%t) %s' // Configurable Quarkus-style logs
+  });
+
+// 2. Subscribe to Telemetry Events (Audit Trails)
+schemaMetadataBuilder.on('execution', (ev) => {
+  // ev contains: action, tableName, duration, status, traceId
+  myMetrics.histogram('db_latency', ev.duration, { table: ev.tableName });
+});
+
+schemaMetadataBuilder.on('security', (ev) => {
+  console.warn(`[Audit] Security event on ${ev.tableName}: ${ev.message}`);
+});
 ```
 
 ---
@@ -92,24 +107,24 @@ Instead of throwing hard errors when an unauthorized field is requested, the RBA
 Policies can be defined as static objects or asynchronous functions that resolve rules dynamically based on the current `ExecutionContext` (which carries contextual data like tenant IDs or request headers).. You can also define a **Global Policy** that applies to all tables as a fallback.
 
 ```typescript
-schemaMetadataBuilder.profiles(['default', 'public', 'admin', 'tenant_user'] as const);
+schemaMetadataBuilder.profiles(['default', 'public', 'admin', 'user'] as const);
 
-// 1. Global Fallback Policy
-schemaMetadataBuilder.policies(async (ctx, tableName, activeProfiles) => {
-  if (activeProfiles.includes("admin")) return { allowedActions: "*" };
-  return { allowedActions: ["read"] }; // Read-only fallback for all tables
+// 1. Global Fallback Policy (Applies to all tables)
+schemaMetadataBuilder.policies((ctx, tableName, profiles) => {
+  if (profiles.includes("admin")) return { allowedActions: "*" };
+  return { allowedActions: ["read"] }; // Read-only fallback
 });
 
 // 2. Table-Specific Policies
 schemaMetadataBuilder.policies('users', {
-  // 1. Static Policy: Applied consistently to the 'public' profile
+  // Static Policy
   public: { 
     allowedActions: ["read"],
-    allowedFilters: ["name", "email", "settings.theme"], // Allows filtering on JSON properties!
-    allowedProjections: ["name", "profile.bio"], // Allows fetching relational data!
+    allowedFilters: ["name", "email", "settings.theme"],
+    allowedProjections: ["name", "profile.bio"],
   },
 
-  // 2. Static Wildcard: Full access for 'admin'
+  // 2. Static Wildcard: Full access
   admin: {
     allowedActions: "*",
     allowedSets: "*",
@@ -117,19 +132,15 @@ schemaMetadataBuilder.policies('users', {
     allowedFilters: "*",
     allowedSorts: "*"
   },
-  
-  // 3. Dynamic Policy: Resolves permissions at runtime
-  tenant_user: async (ctx) => {
-    // Inspect ctx variables set by upstream authentication middlewares
-    const isOwner = ctx.params.filter?.id?.$eq === ctx.state.userId;
+
+  // Dynamic Policy (Async supported)
+  user: async (ctx) => {
+    const isOwner = ctx.params.id === ctx.state.userId;
     
     return {
       allowedActions: isOwner ? ["read", "update"] : ["read"],
       allowedSets: ["settings.theme", "persona.skills"],
-      // Dynamic field resolution is also supported
-      allowedProjections: async (innerCtx) => {
-        return isOwner ? ["*"] : ["name", "avatar"];
-      },
+      allowedProjections: ["*"],
       allowedFilters: "*",
       allowedSorts: "*"
     };

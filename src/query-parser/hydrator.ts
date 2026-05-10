@@ -2,6 +2,7 @@ import { getTableColumns } from "drizzle-orm";
 import { resolveRelationPath } from "./metadata-explorer";
 import { generateAliasName } from "./alias-manager";
 import { assertSafeKey } from "../helper";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Utility to unflatten an object with dot-notation keys.
@@ -74,6 +75,9 @@ export function hydrateResults(
   primaryKeyField: string,
   paths: string[] = []
 ): any[] {
+  if (!rows || rows.length === 0) return [];
+  logger.debug(`Hydrating ${rows.length} rows for table '${baseTableName}'`);
+
   const rootMap = new Map<any, any>();
 
   // Build inverse map from exact alias name to original path
@@ -180,10 +184,12 @@ export function hydrateResults(
           }
         }
       } catch (e) {
-        console.warn(`Hydration warning: ${e}`);
+        logger.warn(`Hydration warning: ${e}`);
       }
     }
   }
+
+  logger.debug(`Hydration complete. Returned ${rootMap.size} root objects.`);
 
   return Array.from(rootMap.values());
 }

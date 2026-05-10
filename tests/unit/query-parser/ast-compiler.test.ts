@@ -1,9 +1,14 @@
-import { expect, test, describe, mock } from "bun:test";
+import { expect, test, describe, mock, beforeEach } from "bun:test";
 import { buildSelection, parseFilter, parseOrder, applyJoins } from "../../../src/query-parser/ast-compiler";
 import { SecurityError, AliasNotFoundError, TableNotFoundError, ColumnNotFoundError, QueryParsingError } from "../../../src/errors";
 import { pgTable, serial, text, json } from "drizzle-orm/pg-core";
+import { clearResolutionCache } from "../../../src/query-parser/metadata-explorer";
 
 describe("Query Parser: AST Compiler", () => {
+  beforeEach(() => {
+    clearResolutionCache();
+  });
+
   const mockDb = { dialect: { escapeParam: (i: number) => `$${i + 1}` } } as any;
   
   const usersTable = pgTable("users", {

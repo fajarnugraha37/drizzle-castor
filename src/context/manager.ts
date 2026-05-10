@@ -2,6 +2,7 @@ import { executionContextStorage } from "./execution-context";
 import type { AnyDatabase, AnyTable, ExecutionContext } from "../types";
 import { assertSafeKey } from "../helper/assert-helper";
 import { defaultTraceIdGenerator } from "../helper/context-helper";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Runs a function within a new ExecutionContext.
@@ -151,7 +152,7 @@ export function endExecutionContext(status: "success" | "failed", error?: any): 
             try {
               await subscriber(snapshot);
             } catch (err) {
-              console.error("[Drizzle-Castor Telemetry Error] Subscriber failed:", err);
+              logger.error("Telemetry Error, subscriber failed:", err);
             }
           });
        }

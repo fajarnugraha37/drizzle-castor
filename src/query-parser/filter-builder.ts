@@ -6,6 +6,7 @@ import { applyJoins, parseFilter, parseOrder, buildSelection } from "./ast-compi
 import { getDialect, getPrimaryKeyColumnName, resolveProviderValues } from "../helper";
 import type { SearchQuery, TranslatorContext } from "../types";
 import { TableNotFoundError } from "../errors";
+import { logger } from "../helper/logger-helper";
 
 
 /**
@@ -108,12 +109,9 @@ export async function buildSearchQueries<T>(
 ) {
   const { db, tables, metadata, baseTableName } = context;
 
-  console.log("buildSearchQueries called with baseTableName:", baseTableName);
-  const baseTable = tables.find((t) => {
-    console.log("Checking table:", getTableName(t));
-    return getTableName(t) === baseTableName;
-  });
-  console.log("Found baseTable:", !!baseTable);
+  logger.debug(`Building search queries for ${baseTableName}`);
+
+  const baseTable = tables.find((t) => getTableName(t) === baseTableName);
   
   if (!baseTable) {
     throw new TableNotFoundError(`Base table '${baseTableName}' not found.`);
@@ -135,6 +133,8 @@ export async function buildSearchQueries<T>(
     metadata,
     baseTableName,
   );
+
+  logger.trace(`Building CTE with ${paths.ctePaths.size} relation paths`);
 
   const pkName = getPrimaryKeyColumnName(baseTable);
   const pkColumn = (baseTable as any)[pkName];
@@ -258,6 +258,8 @@ export async function buildSearchQueries<T>(
     });
     mainQb = mainQb.orderBy(...outerOrderClauses);
   }
+
+  logger.debug(`Successfully built main, CTE, and count queries for ${baseTableName}`);
 
   return {
     cteQuery: cteQb,

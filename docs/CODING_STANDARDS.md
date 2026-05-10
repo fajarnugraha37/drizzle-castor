@@ -8,7 +8,8 @@ This document defines the syntax, style, and conventions used in the `drizzle-ca
 - **Clarity over Brevity:** Write code that is easy to read and understand.
 - **Modularity:** Keep functions focused on a single responsibility. Extract reusable logic into helper functions.
 - **No God Files:** Adhere to the strict constraint that a single file should not exceed 300 lines. Break down complex logic into smaller modules.
-- **Immutability:** Favor immutability where possible, but use controlled mutations when necessary for performance (e.g., building ASTs).
+- **Observability:** NEVER use `console.log` or `console.warn` in library code. Use the internal `logger` instance (powered by Pino). Choose appropriate levels: `TRACE` for noisy step-by-step logic, `DEBUG` for operational details, `INFO` for significant lifecycle events.
+- **Telemetry:** Emit structured events via the internal emitter for all physical database actions, security events, and errors. Ensure events are non-blocking.
 - **Execution Context:** Never share state across asynchronous boundaries globally. Rely strictly on the `ExecutionContext` via the `runInContext` pipeline.
 
 ## 2. Naming Conventions
@@ -88,8 +89,9 @@ try {
 ## 7. Tests
 
 - **Integration Tests:** New features (especially AST translators and DB interactions) must include integration tests covering all supported dialects (`postgresql`, `mysql`, `sqlite`) using Testcontainers.
-- **Unit Tests:** Pure logic (e.g., middleware routing, RBAC data trimming, string parsing) should be tested via isolated unit tests using Bun.
-- **Coverage:** Aim for high coverage on core execution pathways. Ensure error-throwing pathways (e.g., `SecurityError`) are explicitly tested.
+- **Unit Tests:** Pure logic should be tested via isolated unit tests using Bun. Use `bun test --isolate` to prevent global state (like metadata caches) from leaking between test files.
+- **Coverage:** Aim for high coverage on core execution pathways. New modules should aim for ~100% line coverage. Ensure error-throwing pathways and security trimming logic are explicitly verified.
+- **Telemetry Validation:** Tests should assert that correct telemetry events (e.g., `execution`, `security`) are emitted during operation execution.
 
 ## 8. Changes to This Guide
 

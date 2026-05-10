@@ -1,5 +1,6 @@
 import type { QueryPaths } from "../types";
 import { resolvePathSegments } from "./metadata-explorer";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Ensures a relation path and all its intermediate parent paths are added to the Set.
@@ -41,6 +42,9 @@ export function analyzeQuery<T>(
   const outerPaths = new Set<string>();
   let needsGroupBy = false;
 
+  logger.debug(`Analyzing query for table '${baseTableName}'`);
+  logger.trace("Query parameters:", query);
+
   // 1. Analyze Filter (Rule A: must be inside CTE)
   if (query.filter) {
     extractFilterPaths(query.filter, ctePaths, metadata, baseTableName);
@@ -71,6 +75,10 @@ export function analyzeQuery<T>(
       }
     }
   }
+
+  logger.debug(`Analysis complete. Found ${ctePaths.size} CTE paths and ${outerPaths.size} outer paths.`);
+  if (ctePaths.size > 0) logger.trace(`CTE Paths: ${Array.from(ctePaths).join(", ")}`);
+  if (outerPaths.size > 0) logger.trace(`Outer Paths: ${Array.from(outerPaths).join(", ")}`);
 
   return { ctePaths, outerPaths, needsGroupBy };
 }

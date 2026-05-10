@@ -69,6 +69,11 @@ export const schemaMetadataBuilder = createSchemaBuilder(db, [
   userGroups,
 ] as const)
   .profiles(['default', 'public', 'admin', 'guest'] as const)
+  .withLogger({
+    level: "TRACE",
+    // format: "[%d{HH:mm:ss}] %p [%c] (%t) %{tableName}.%{action} - %s%e%n"
+    format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c] (%t) %s%e%n"
+  })
   .policies('users', {
     default: { 
       allowedActions: ["read"],
@@ -118,6 +123,25 @@ export const schemaMetadataBuilder = createSchemaBuilder(db, [
     
     return result;
   }, { tables: "users" })
+  .policies(async (ctx, tableName, activeProfiles) => {
+    // Global Fallback Policy
+    if (activeProfiles.includes("admin")) {
+      return { 
+        allowedActions: "*",
+        allowedSets: "*",
+        allowedProjections: "*",
+        allowedFilters: "*",
+        allowedSorts: "*"
+      };
+    }
+    
+    // Default fallback for other profiles (guest, public) on non-configured tables
+    if (activeProfiles.includes("guest") || activeProfiles.includes("public")) {
+      return { allowedActions: ["read"], allowedProjections: ["*"], allowedFilters: ["*"] };
+    }
+    
+    return { allowedActions: [] }; // Deny by default
+  })
   .table("users", {
     oneToOne: [
       {

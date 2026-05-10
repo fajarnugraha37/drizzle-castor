@@ -2,6 +2,7 @@ export * from "./base";
 export * from "./context";
 export * from "./helper";
 export * from "./hook";
+export * from "./logger";
 export * from "./middleware";
 export * from "./query";
 export * from "./rbac";

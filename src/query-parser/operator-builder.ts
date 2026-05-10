@@ -27,6 +27,7 @@ import {
 import type { AnyColumn } from "drizzle-orm";
 import { getDialect } from "../helper";
 import { QueryParsingError } from "../errors";
+import { logger } from "../helper/logger-helper";
 
 /**
  * Maps a single NoSQL-like operator to a Drizzle SQL condition.
@@ -43,6 +44,7 @@ export function buildFieldOperator(
 ): SQL | undefined {
   if (value === undefined) return undefined;
 
+  logger.trace(`Building field operator: ${operator}`);
   const dialect = getDialect(db);
   const isSQLite = dialect === "sqlite";
 
@@ -143,6 +145,8 @@ export function buildConjunction(
   const validConditions = conditions.filter((c): c is SQL => c !== undefined);
 
   if (validConditions.length === 0) return undefined;
+
+  logger.trace(`Building conjunction: ${type} (${validConditions.length} conditions)`);
 
   switch (type) {
     case "$and":
