@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # Allows manual execution
   push:
     tags:
-      - 'v*' # Triggered when a new version tag is pushed (e.g. by Changesets)
+      - "v*.*.*"
 
 jobs:
   publish:
