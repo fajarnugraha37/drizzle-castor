@@ -32,9 +32,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build project
-        run: bun run build
+        run: bunx tsc --noEmit && bun run build
 
       - name: Publish to NPM
-        run: npm publish --access public
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
