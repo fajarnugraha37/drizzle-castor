@@ -1,4 +1,4 @@
-name: Release Orchestrator
+name: Release (Fast-Track)
 
 on:
   push:
@@ -10,20 +10,22 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
-  release:
-    name: Versioning & Tagging
+  # STEP 1: Versioning, Tagging & GitHub Release
+  tag-and-release:
+    name: Create Tag & Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.get-version.outputs.version }}
+      has_changesets: ${{ steps.check-changesets.outputs.has_changesets }}
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_PAT }} # MANDATORY for triggering other workflows
+          token: ${{ secrets.RELEASE_PAT }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -33,12 +35,101 @@ jobs:
       - name: Install Dependencies
         run: bun install --frozen-lockfile
 
-      - name: Create Release PR or Create Tag/Release
-        id: changesets
-        uses: changesets/action@v1
+      - name: Check for Changesets
+        id: check-changesets
+        run: |
+          if [ -d ".changeset" ] && [ "$(ls -A .changeset | grep .md | grep -v README.md)" ]; then
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Version and Tag
+        if: steps.check-changesets.outputs.has_changesets == 'true'
+        id: get-version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 1. Bump version
+          bunx changeset version
+          
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # 2. Sync to jsr.json
+          node -e "const fs = require('fs'); const jsr = JSON.parse(fs.readFileSync('./jsr.json', 'utf8')); jsr.version = '$VERSION'; fs.writeFileSync('./jsr.json', JSON.stringify(jsr, null, 2) + '\n');"
+          
+          # 3. Commit and Tag
+          git add .
+          git commit -m "chore: release v$VERSION [skip ci]"
+          bunx changeset tag
+          
+          # 4. Push changes and tags
+          git push origin main --follow-tags
+
+  # STEP 2: Publish to NPM
+  publish-npm:
+    name: Publish to NPM
+    needs: tag-and-release
+    if: needs.tag-and-release.outputs.has_changesets == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
         with:
-          # Use 'tag' script instead of 'publish' to only generate tags and GH Releases
-          publish: bun run tag
+          ref: main # Ensure we get the latest commit with version bump
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build project
+        run: bunx tsc --noEmit && bun run build
+
+      - name: Publish to NPM
+        run: npm publish --provenance --access public
         env:
-          # IMPORTANT: Using a PAT allows this action to trigger other workflows (NPM/JSR)
-          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # STEP 3: Publish to JSR
+  publish-jsr:
+    name: Publish to JSR
+    needs: tag-and-release
+    if: needs.tag-and-release.outputs.has_changesets == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build project
+        run: bunx tsc --noEmit && bun run build
+
+      - name: Publish to JSR
+        run: bunx jsr publish --allow-dirty

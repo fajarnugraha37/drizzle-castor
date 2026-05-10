@@ -29,12 +29,17 @@ After completing your code changes, you must document the impact of your changes
 4.  **Open and Merge Pull Request**:
     Create a PR on GitHub from your feature branch to `main`. Once merged, the automation kicks in.
 
-### 2. Versioning (Automated PR)
-Once your changes reach the `main` branch, the **Release Orchestrator** workflow detects the new changeset files.
+### 2. PR & Automated Release
+Once your changes are pushed to a feature branch:
 
-*   **Action**: A "Version Packages" Pull Request is automatically opened by the GitHub Actions bot.
-*   **Contents**: This PR includes the version bump in `package.json` and the auto-generated entries in `CHANGELOG.md`.
-*   **Your Task**: **Merge** this PR into `main` to trigger the actual release.
+1.  **Open a Pull Request**: Create a PR from your feature branch to `main`.
+2.  **CI Validation**: The **CI** workflow will automatically run build and unit tests on the PR.
+3.  **Merge**: Once approved and tests pass, **Merge** the PR into `main`.
+4.  **One-Click Automation**: Merging into `main` triggers the **Release** workflow which automatically:
+    *   Bumps the version in `package.json` and `jsr.json`.
+    *   Commits version changes back to `main`.
+    *   Creates a **Git Tag** and **GitHub Release**.
+    *   Triggers parallel publishing to **NPM** and **JSR**.
 
 ### 3. Tagging & Orchestration
 Upon merging the versioning PR:
