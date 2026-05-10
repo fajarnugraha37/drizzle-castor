@@ -1,6 +1,6 @@
 {
   "name": "drizzle-castor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A CRUD library for Drizzle ORM, designed to simplify database operations with a focus on type safety and ease of use.",
   "private": false,
   "type": "module",
