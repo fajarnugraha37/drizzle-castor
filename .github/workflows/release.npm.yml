@@ -1,10 +1,13 @@
 name: Release to NPM
 
 on:
-  workflow_dispatch: # Allows manual execution
   push:
     tags:
-      - 'v*'
+      - "v*.*.*"
+  workflow_dispatch: # Keep manual as backup
+
+permissions:
+  contents: read
 
 jobs:
   publish:
@@ -22,7 +25,7 @@ jobs:
       - name: Install Dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build
+      - name: Build project
         run: bun run build
 
       - name: Publish to NPM
