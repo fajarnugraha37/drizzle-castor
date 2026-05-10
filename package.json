@@ -1,5 +1,5 @@
 {
-  "name": "drizzle-castor",
+  "name": "@fajarnugraha37/drizzle-castor",
   "version": "0.1.2",
   "description": "A CRUD library for Drizzle ORM, designed to simplify database operations with a focus on type safety and ease of use.",
   "private": false,

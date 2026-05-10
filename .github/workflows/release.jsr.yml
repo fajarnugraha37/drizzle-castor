@@ -6,6 +6,10 @@ on:
     tags:
       - "v*.*.*"
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   publish:
     name: JSR Publish
@@ -24,7 +28,7 @@ jobs:
 
       - name: Install Dependencies
         run: bun install --frozen-lockfile
-        
+
       - name: Build project
         run: bunx tsc --noEmit && bun run build
 
@@ -35,4 +39,4 @@ jobs:
           node -e "const fs = require('fs'); const jsr = JSON.parse(fs.readFileSync('./jsr.json', 'utf8')); jsr.version = '$VERSION'; fs.writeFileSync('./jsr.json', JSON.stringify(jsr, null, 2) + '\n');"
 
       - name: Publish to JSR
-        run: bunx jsr publish
+        run: bunx jsr publish --provenance --allow-slow-types
