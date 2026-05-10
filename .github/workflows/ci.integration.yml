@@ -29,7 +29,7 @@ jobs:
 
       - name: Run SQLite Integration Tests
         run: |
-          bun test .\tests\integration\sqlite --exit --exit > sqlite_test_output.txt 2>&1 || true
+          bun test ./tests/integration/sqlite --exit --exit > sqlite_test_output.txt 2>&1 || true
           cat sqlite_test_output.txt
           if grep -q "0 fail" sqlite_test_output.txt; then
             echo "SQLite integration tests passed"
