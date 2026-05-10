@@ -6,6 +6,9 @@ on:
       - "v*.*.*"
   workflow_dispatch: # Keep manual as backup
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
   id-token: write # Required for NPM provenance and OIDC
