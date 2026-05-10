@@ -30,7 +30,7 @@ export async function runInContext<
   const spanId = await traceIdGenerator(); // Generate a new spanId for this execution context
 
   // Explicit mapping to avoid shallow copy/spread issues and ensure immutability of structure
-  // Metadata is inherited from parent if it exists
+  // Metadata and transaction status are inherited from parent if it exists
   const context: ExecutionContext<TDb, TTables, TMetadata, TState> = {
     traceId,
     spanId,
@@ -45,8 +45,18 @@ export async function runInContext<
       ...(parent?.metadata || {}),
       ...(data.metadata || {}),
     } as TMetadata,
-    translatorContext: data.translatorContext,
-    state: {} as TState,
+    isInTransaction: data.isInTransaction || (parent?.isInTransaction ?? false),
+    translatorContext: {
+      ...(data.translatorContext || {}),
+      // CRITICAL FIX: Smart handle prioritization.
+      // 1. If parent is already in a transaction, and this span is NOT explicitly starting a NEW transaction (isInTransaction is not true in data),
+      //    we MUST inherit the parent's transaction handle to ensure stale repositories (created outside) join the active transaction.
+      // 2. Otherwise, use the provided handle (which could be a NEW transaction handle from withTransaction, or the root DB).
+      db: (parent?.isInTransaction && !data.isInTransaction) ? parent.translatorContext.db : data.translatorContext?.db,
+    } as any,
+    // CRITICAL: state must be a reference to the same object across the entire trace
+    // to allow middleware to share data persistently across nested spans.
+    state: parent ? parent.state : ((data as any).state || {}) as TState,
   };
   (context as any)._startPerfTime = performance.now();
 

@@ -1,5 +1,9 @@
-import { useExecutionContext, updateContextMetadata } from "../context/manager";
-import type { AnyDatabase, AnyTable, ExecutionContext } from "../types";
+import { sql } from "drizzle-orm";
+import { useExecutionContext, updateContextMetadata, runInContext } from "../context/manager";
+import type { AnyDatabase, AnyTable, ExecutionContext, TransactionOptions } from "../types";
+import { ConfigurationError } from "../errors";
+import { logger } from "./logger-helper";
+import { getDialect, executeRaw } from "./dialect-helper";
 
 /**
  * Shorthand to get the current ExecutionContext.
@@ -65,4 +69,114 @@ export const defaultTraceIdGenerator = (): string => {
   
   // Fallback for older environments
   return Math.random().toString(36).substring(2);
+};
+
+/**
+ * Executes a block of code within a transaction handle, respecting the propagation rules.
+ * This is used internally by executors to ensure atomicity.
+ */
+export async function withTransaction<T>(
+  ctx: ExecutionContext,
+  fn: (tx: any) => Promise<T>,
+  options: TransactionOptions = { propagation: "REQUIRED" },
+): Promise<T> {
+  const { db } = ctx.translatorContext;
+  const propagation = options.propagation || "REQUIRED";
+  const isInActiveTransaction = ctx.isInTransaction || false;
+
+  const dialect = getDialect(db);
+  const isSQLite = dialect === "sqlite";
+
+  logger.trace(`withTransaction: propagation=${propagation}, isInTransaction=${isInActiveTransaction}, dialect=${dialect}`);
+
+  const executeInNewTransaction = async () => {
+    // CRITICAL: Drizzle's BunSQLite and BetterSQLite3 drivers are synchronous.
+    // When passed an async callback, they commit immediately because the promise is truthy.
+    // We must manually manage BEGIN/COMMIT/ROLLBACK for SQLite to support async-first Castor.
+    if (isSQLite) {
+      const isNested = isInActiveTransaction;
+      const spName = isNested ? `sp_${Date.now()}_${Math.floor(Math.random() * 1000)}` : null;
+      
+      const beginSql = spName ? sql`SAVEPOINT ${sql.identifier(spName)}` : sql`BEGIN TRANSACTION`;
+      const commitSql = spName ? sql`RELEASE SAVEPOINT ${sql.identifier(spName)}` : sql`COMMIT`;
+      const rollbackSql = spName ? sql`ROLLBACK TO SAVEPOINT ${sql.identifier(spName)}` : sql`ROLLBACK`;
+
+      await executeRaw(db, beginSql);
+      try {
+        const res = await runInContext({
+          action: ctx.action,
+          tableName: ctx.tableName,
+          profile: ctx.profile,
+          params: ctx.params,
+          metadata: ctx.metadata,
+          isInTransaction: true,
+          translatorContext: {
+            ...ctx.translatorContext,
+            db, // Reuse current handle as it's SQLite (one connection/locked)
+          }
+        }, () => fn(db));
+        await executeRaw(db, commitSql);
+        return res;
+      } catch (e) {
+        await executeRaw(db, rollbackSql);
+        throw e;
+      }
+    }
+
+    // For Async-capable drivers (PG, MySQL, LibSQL), use native Drizzle transactions
+    return await db.transaction(async (tx: any) => {
+      return await runInContext({
+        action: ctx.action,
+        tableName: ctx.tableName,
+        profile: ctx.profile,
+        params: ctx.params,
+        metadata: ctx.metadata,
+        isInTransaction: true,
+        translatorContext: {
+          ...ctx.translatorContext,
+          db: tx,
+        }
+      }, () => fn(tx));
+    }, options as any);
+  };
+
+  switch (propagation) {
+    case "REQUIRED":
+      if (isInActiveTransaction) {
+        logger.trace("REQUIRED: Joining existing transaction");
+        return await fn(db);
+      }
+      logger.trace("REQUIRED: Starting new transaction");
+      return await executeInNewTransaction();
+
+    case "REQUIRES_NEW":
+      logger.trace("REQUIRES_NEW: Starting new transaction/savepoint");
+      return await executeInNewTransaction();
+
+    case "NESTED":
+      logger.trace("NESTED: Starting nested transaction/savepoint");
+      return await executeInNewTransaction();
+
+    case "SUPPORTS":
+      return await fn(db);
+
+    case "MANDATORY":
+      if (!isInActiveTransaction) {
+        throw new ConfigurationError(
+          "Transaction propagation 'MANDATORY' failed: No active transaction found in context.",
+        );
+      }
+      return await fn(db);
+
+    case "NEVER":
+      if (isInActiveTransaction) {
+        throw new ConfigurationError(
+          "Transaction propagation 'NEVER' failed: Active transaction found in context.",
+        );
+      }
+      return await fn(db);
+
+    default:
+      return await fn(db);
+  }
 }

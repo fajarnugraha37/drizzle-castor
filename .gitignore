@@ -42,3 +42,6 @@ test-*.ts
 .bug-hunter/
 GEMINI.md
 .gemini/
+*.db
+*.db-shm
+*.db-wal

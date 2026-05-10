@@ -46,12 +46,34 @@ export function generateTempTableName(): string {
 }
 
 /**
+ * Cross-dialect execution helper for commands that don't return rows (e.g., BEGIN, COMMIT, DDL).
+ */
+export async function executeRaw(db: any, query: any): Promise<any> {
+  // 1. Try .execute() (standard for PG, MySQL, and some SQLite drivers like LibSQL/D1)
+  if (typeof db.execute === "function") {
+    return await db.execute(query);
+  }
+  // 2. Try .run() (standard for BunSQLite, BetterSQLite3)
+  if (typeof db.run === "function") {
+    return await db.run(query);
+  }
+  // 3. Last resort fallback
+  throw new Error(`[Drizzle-Castor] Unsupported database driver: method '.execute' or '.run' not found.`);
+}
+
+/**
  * Cross-dialect helper to get row count from a result object or a table.
  * Uses explicit normalization based on the detected dialect and driver variations.
  */
 export async function getTempTableCount(tx: any, tableIdent: any): Promise<number> {
-  const result: any = await tx.execute(sql`SELECT COUNT(*) as count FROM ${tableIdent}`);
   const dialect = getDialect(tx);
+  let result: any;
+  
+  if (dialect === "sqlite" && typeof tx.all === "function") {
+    result = await tx.all(sql`SELECT COUNT(*) as count FROM ${tableIdent}`);
+  } else {
+    result = await (tx.execute ? tx.execute(sql`SELECT COUNT(*) as count FROM ${tableIdent}`) : tx.run(sql`SELECT COUNT(*) as count FROM ${tableIdent}`));
+  }
   
   let rows: any[] = [];
 

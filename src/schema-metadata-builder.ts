@@ -1,6 +1,6 @@
 import mitt from "mitt";
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition, CastorEvents, LoggerConfig, CastorInstance } from "./types";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition, CastorEvents, LoggerConfig, CastorInstance, TransactionOptions } from "./types";
 import { logger } from "./helper/logger-helper";
 
 export class SchemaBuilder<
@@ -14,6 +14,10 @@ export class SchemaBuilder<
   private registeredPolicies: Map<string, PolicyDefinition<any, any, any>> = new Map();
   private globalPolicy?: GlobalPolicyDefinition<any, any>;
   private loggerConfig: LoggerConfig = { level: "WARN" };
+  private transactionOptions: TransactionOptions = {
+    propagation: "REQUIRED",
+    isolationLevel: "read committed",
+  };
   private isThrowError: boolean = false;
   private traceIdGenerator?: TraceIdGenerator;
   private emitter = mitt<CastorEvents>();
@@ -37,6 +41,7 @@ export class SchemaBuilder<
     newBuilder.registeredPolicies = new Map(this.registeredPolicies);
     newBuilder.globalPolicy = this.globalPolicy;
     newBuilder.loggerConfig = this.loggerConfig;
+    newBuilder.transactionOptions = { ...this.transactionOptions };
     newBuilder.isThrowError = this.isThrowError;
     newBuilder.traceIdGenerator = this.traceIdGenerator;
     newBuilder.emitter = this.emitter;
@@ -106,6 +111,7 @@ export class SchemaBuilder<
     newBuilder.registeredPolicies = new Map(this.registeredPolicies);
     newBuilder.globalPolicy = this.globalPolicy;
     newBuilder.loggerConfig = this.loggerConfig;
+    newBuilder.transactionOptions = { ...this.transactionOptions };
     newBuilder.isThrowError = this.isThrowError;
     newBuilder.traceIdGenerator = this.traceIdGenerator;
     newBuilder.emitter = this.emitter;
@@ -115,6 +121,12 @@ export class SchemaBuilder<
   withLogger(config: LoggerConfig): this {
     this.loggerConfig = config;
     logger.debug(`Logger configured with level: ${config.level || "WARN"}`);
+    return this;
+  }
+
+  withTransaction(options: TransactionOptions): this {
+    this.transactionOptions = { ...this.transactionOptions, ...options };
+    logger.debug(`Default transaction options configured: ${JSON.stringify(this.transactionOptions)}`);
     return this;
   }
 
@@ -131,7 +143,8 @@ export class SchemaBuilder<
       this.emitter,
       this.loggerConfig,
       this.isThrowError,
-      this.traceIdGenerator
+      this.traceIdGenerator,
+      this.transactionOptions
     )(finalMetadata);
   }
 }

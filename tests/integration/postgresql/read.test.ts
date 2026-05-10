@@ -1,20 +1,35 @@
 import { describe, test, before, after } from "node:test";
 import { expect } from "expect";
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { sql, eq } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
-import { users, profiles, posts, categories, postsToCategories } from "./schema";
+import { users, profiles, posts, categories, postsToCategories, migrations } from "./schema";
 
 describe("PostgreSQL Integration - Read Operations", () => {
   let container: StartedPostgreSqlContainer;
   let pool: pg.Pool;
-  let db: any;
+  let db: NodePgDatabase;
   let builder: any;
 
   before(async () => {
-    container = await new PostgreSqlContainer("postgres:16-alpine").start();
+    container = await new PostgreSqlContainer("postgres:16-alpine")
+      .withCommand([
+        "postgres",
+        "-c", "shared_buffers=64MB",
+        "-c", "wal_level=minimal",
+        "-c", "max_wal_senders=0",
+        "-c", "synchronous_commit=off",
+        "-c", "fsync=off",           // ⚠️ ONLY FOR TEST
+        "-c", "full_page_writes=off",
+        "-c", "autovacuum=off",
+        "-c", "checkpoint_timeout=30min",
+        "-c", "max_connections=10",
+      ])
+      .withBindMounts([])
+      .withTmpFs({ "/var/lib/postgresql/data": "rw" }) 
+      .start();
     pool = new pg.Pool({
       connectionString: container.getConnectionUri(),
     });
@@ -22,40 +37,9 @@ describe("PostgreSQL Integration - Read Operations", () => {
       logger: true,
     });
 
-    // Create tables
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        age INTEGER,
-        metadata JSONB,
-        settings JSONB,
-        deleted_flag INTEGER DEFAULT 0,
-        deleted_at TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS profiles (
-        id SERIAL PRIMARY KEY,
-        bio TEXT,
-        user_id INTEGER NOT NULL REFERENCES users(id)
-      );
-      CREATE TABLE IF NOT EXISTS posts (
-        id SERIAL PRIMARY KEY,
-        title TEXT NOT NULL,
-        content TEXT,
-        author_id INTEGER REFERENCES users(id),
-        deleted_flag INTEGER DEFAULT 0
-      );
-      CREATE TABLE IF NOT EXISTS categories (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS posts_to_categories (
-        post_id INTEGER NOT NULL REFERENCES posts(id),
-        category_id INTEGER NOT NULL REFERENCES categories(id),
-        PRIMARY KEY (post_id, category_id)
-      );
-    `);
+    for (const ddl of migrations) {
+      await db.execute(ddl);
+    }
 
     builder = createSchemaBuilder(db, [users, profiles, posts, categories, postsToCategories] as const, "lenient")
       .table("users", {
@@ -89,6 +73,17 @@ describe("PostgreSQL Integration - Read Operations", () => {
             foreignKey: "users.id",
           }
         ],
+        manyToMany: [
+          {
+            relationName: "categories",
+            relatedTable: "categories",
+            joinTable: "posts_to_categories",
+            localKey: "posts.id",
+            joinLocalKey: "posts_to_categories.postId",
+            relatedKey: "categories.id",
+            joinRelatedKey: "posts_to_categories.categoryId",
+          }
+        ],
         softDelete: {
           deleteValue: { deletedFlag: 1 },
           restoreValue: { deletedFlag: 0 }
@@ -100,15 +95,27 @@ describe("PostgreSQL Integration - Read Operations", () => {
     const userRepo = builder.repoFactory("users", {});
     const profileRepo = builder.repoFactory("profiles", {});
     const postRepo = builder.repoFactory("posts", {});
+    const categoryRepo = builder.repoFactory("categories", {});
 
     const newUser1 = await userRepo.createOne({ name: "Alice", email: "alice@example.com", age: 25, deletedFlag: 0 }, "admin");
-    await userRepo.createOne({ name: "Bob", email: "bob@example.com", age: 30, deletedFlag: 0 }, "admin");
+    const newUser2 = await userRepo.createOne({ name: "Bob", email: "bob@example.com", age: 30, deletedFlag: 0 }, "admin");
     await userRepo.createOne({ name: "Charlie", email: "charlie@example.com", age: 35, deletedFlag: 1 }, "admin"); // Soft deleted
 
     await profileRepo.createOne({ bio: "Alice's bio", userId: newUser1.id }, "admin");
 
-    await postRepo.createOne({ title: "Alice's Post", content: "Hello world", authorId: newUser1.id, deletedFlag: 0 }, "admin");
+    const post1 = await postRepo.createOne({ title: "Alice's Post", content: "Hello world", authorId: newUser1.id, deletedFlag: 0 }, "admin");
     await postRepo.createOne({ title: "Deleted Post", content: "Bye world", authorId: newUser1.id, deletedFlag: 1 }, "admin");
+    const post2 = await postRepo.createOne({ title: "Bob's Post", content: "MySQL/PG test", authorId: newUser2.id, deletedFlag: 0 }, "admin");
+
+    const cat1 = await categoryRepo.createOne({ name: "Tech" }, "admin");
+    const cat2 = await categoryRepo.createOne({ name: "News" }, "admin");
+
+    // Junction data
+    await db.insert(postsToCategories).values([
+      { postId: post1.id, categoryId: cat1.id },
+      { postId: post1.id, categoryId: cat2.id },
+      { postId: post2.id, categoryId: cat1.id },
+    ]);
 
     // Seed for JSON tests
     await userRepo.createOne({ 
@@ -131,6 +138,77 @@ describe("PostgreSQL Integration - Read Operations", () => {
   after(async () => {
     if (pool) await pool.end();
     if (container) await container.stop();
+  });
+
+  describe("Relationship Operations", () => {
+    test("searchOne - with relation (one-to-one)", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const user = await userRepo.searchOne({
+        filter: { name: { $eq: "Alice" } },
+        projection: ["id", "name", "profile.bio"]
+      }, "admin");
+
+      expect(user).toBeDefined();
+      expect(user?.profile).toBeDefined();
+      expect(user?.profile.bio).toBe("Alice's bio");
+    });
+
+    test("searchOne - with relation (one-to-many)", async () => {
+      const userRepo = builder.repoFactory("users", {});
+      const user = await userRepo.searchOne({
+        filter: { name: { $eq: "Alice" } },
+        projection: ["id", "name", "posts.title"]
+      }, "admin");
+
+      expect(user).toBeDefined();
+      expect(user?.posts).toBeDefined();
+      expect(user?.posts).toHaveLength(1); // Only active posts
+      expect(user?.posts[0].title).toBe("Alice's Post");
+    });
+
+    test("searchOne - with relation (many-to-one)", async () => {
+      const postRepo = builder.repoFactory("posts", {});
+      const post = await postRepo.searchOne({
+        filter: { title: { $eq: "Alice's Post" } },
+        projection: ["id", "title", "author.name"]
+      }, "admin");
+
+      expect(post).toBeDefined();
+      expect(post?.author).toBeDefined();
+      expect(post?.author.name).toBe("Alice");
+    });
+
+    test("searchOne - with relation (many-to-many)", async () => {
+      const postRepo = builder.repoFactory("posts", {});
+      const post = await postRepo.searchOne({
+        filter: { title: { $eq: "Alice's Post" } },
+        projection: ["id", "title", "categories.name"]
+      }, "admin");
+
+      expect(post).toBeDefined();
+      expect(post?.categories).toBeDefined();
+      expect(post?.categories).toHaveLength(2);
+      const catNames = post?.categories.map((c: any) => c.name);
+      expect(catNames).toContain("Tech");
+      expect(catNames).toContain("News");
+    });
+
+    test("searchMany - filtering across many-to-many and many-to-one", async () => {
+      const postRepo = builder.repoFactory("posts", {});
+      const postsResult = await postRepo.searchMany({
+        filter: { 
+          "categories.name": { $eq: "Tech" },
+          "author.age": { $lt: 30 }
+        },
+        projection: ["id", "title", "author.name"]
+      }, "admin");
+
+      // Alice's Post is Tech and Alice is 25 (< 30)
+      // Bob's Post is Tech but Bob is 30 (not < 30)
+      expect(postsResult).toHaveLength(1);
+      expect(postsResult[0].title).toBe("Alice's Post");
+      expect(postsResult[0].author.name).toBe("Alice");
+    });
   });
 
   describe("Advanced Operators", () => {
@@ -379,5 +457,23 @@ describe("PostgreSQL Integration - Read Operations", () => {
 
     expect(deletedUsers).toHaveLength(1);
     expect(deletedUsers[0].name).toBe("Charlie");
+  });
+
+  test("searchDeletedPage - paginated deleted records", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    
+    // Seed more deleted records for pagination
+    await userRepo.createOne({ name: "Del 1", email: "del1@ex.com", deletedFlag: 1, deletedAt: new Date() }, "admin");
+    await userRepo.createOne({ name: "Del 2", email: "del2@ex.com", deletedFlag: 1, deletedAt: new Date() }, "admin");
+
+    const page = await userRepo.searchDeletedPage({
+      page: 1,
+      pageSize: 2,
+      order: { name: "asc" }
+    }, "admin");
+
+    expect(page.data).toHaveLength(2);
+    expect(page.meta.totalItems).toBeGreaterThanOrEqual(3); // Charlie + Del 1 + Del 2
+    expect(page.meta.totalPages).toBeGreaterThanOrEqual(2);
   });
 });

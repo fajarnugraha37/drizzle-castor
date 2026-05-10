@@ -1,4 +1,4 @@
-name: Manual Integration Tests
+name: Integration Tests
 
 on:
   workflow_dispatch: # Allows manual execution only
@@ -26,9 +26,6 @@ jobs:
 
       - name: Install Dependencies
         run: bun install --frozen-lockfile
-
-      - name: Build project
-        run: bun run build
 
       - name: Run SQLite Integration Tests
         run: |

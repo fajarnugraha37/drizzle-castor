@@ -1,12 +1,12 @@
 import { expect, test, describe, beforeAll } from "bun:test";
-import { drizzle } from "drizzle-orm/bun-sqlite";
+import { BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Database } from "bun:sqlite";
 import { sql } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
-import { users } from "./schema";
+import { migrations, users } from "./schema";
 
 describe("SQLite Integration - Delete & Restore Operations", () => {
-  let db: any;
+  let db: BunSQLiteDatabase;
   let builder: any;
 
   beforeAll(async () => {
@@ -15,18 +15,9 @@ describe("SQLite Integration - Delete & Restore Operations", () => {
       logger: true,
     });
 
-    db.run(sql`
-      CREATE TABLE users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        age INTEGER,
-        metadata TEXT,
-        settings TEXT,
-        deleted_flag INTEGER DEFAULT 0,
-        deleted_at TEXT
-      )
-    `);
+    for (const ddl of migrations) {
+      db.run(ddl);
+    }
 
     builder = createSchemaBuilder(db, [users] as const, "lenient")
       .table("users", {
@@ -80,6 +71,23 @@ describe("SQLite Integration - Delete & Restore Operations", () => {
     expect(restored).toBeDefined();
     expect(restored?.deletedFlag).toBe(0);
     expect(restored?.deletedAt).toBeNull();
+  });
+
+  test("restoreMany - should bring back multiple soft-deleted records", async () => {
+    const userRepo = builder.repoFactory("users", {});
+    
+    // Seed some deleted records. 
+    // MUST provide deletedAt because it's configured as dynamic in softDelete config, 
+    // which causes injectSoftDeleteFilter to add IS NOT NULL condition.
+    await userRepo.createOne({ name: "D1", email: "d1@ex.com", deletedFlag: 1, deletedAt: new Date().toISOString() }, "admin");
+    await userRepo.createOne({ name: "D2", email: "d2@ex.com", deletedFlag: 1, deletedAt: new Date().toISOString() }, "admin");
+
+    const count = await userRepo.restoreMany({ name: { $like: "D%" } }, "admin");
+    expect(count).toBe(2);
+
+    const active = await userRepo.searchMany({ filter: { name: { $like: "D%" } } }, "admin");
+    expect(active).toHaveLength(2);
+    expect(active.every((u: any) => u.deletedFlag === 0)).toBe(true);
   });
 
   test("hardDeleteOne - should permanently remove", async () => {

@@ -6,8 +6,7 @@ import { updateExample } from "./modules/update.example";
 import { readExample } from "./modules/read.example";
 import { hardDeleteExample } from "./modules/hard-delete.example";
 import { softDeleteExample } from "./modules/soft-delete.example";
-import { isQueryError, isSecurityError } from "../src";
-import { Middleware } from "../dist";
+import { isQueryError, isSecurityError, Middleware } from "../src";
 
 {
   const [, , command, subCommand, ...args] = process.argv;

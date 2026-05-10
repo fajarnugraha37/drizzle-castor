@@ -1,3 +1,15 @@
+# Drizzle Castor
+
+[![NPM Version](https://img.shields.io/npm/v/@fajarnugraha37/drizzle-castor.svg)](https://www.npmjs.com/package/@fajarnugraha37/drizzle-castor)
+[![JSR Version](https://jsr.io/badges/@fajar/drizzle-castor)](https://jsr.io/@fajar/drizzle-castor)
+
+[![Bun](https://img.shields.io/badge/Bun-1.0+-green.svg)](https://bun.sh/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
+[![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.30+-green.svg)](https://orm.drizzle.team/)
+[![SQLite](https://img.shields.io/badge/SQLite-3.9.0+-green.svg)](https://sqlite.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-green.svg)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8+-green.svg)](https://www.mysql.com/)
+
 <h1 align="center">
   <a href="https://github.com/fajarnugraha37/drizzle-castor">
     <picture>
@@ -6,58 +18,27 @@
   </a>
 </h1>
 <p align="center">
-    <em><b>drizzle-castor</b> is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over
+    <em><b>Drizzle Castor</b> is a type-safe CRUD library and Data Access Object (DAO) abstraction designed to simplify database operations over
       <b><a href="https://orm.drizzle.team/" target="_blank">Drizzle ORM</a></b>. It provides a JSON-based querying syntax, an extensible middleware pipeline, unified Role-Based Access Control (RBAC), and multi-dialect execution strategies.
     </em>
 </p>
 
 ---
 
-# Drizzle-Castor
-
-[![NPM Version](https://img.shields.io/npm/v/@fajarnugraha37/drizzle-castor.svg)](https://www.npmjs.com/package/@fajarnugraha37/drizzle-castor)
-[![JSR Version](https://jsr.io/badges/@fajar/drizzle-castor)](https://jsr.io/@fajar/drizzle-castor)
-[![Bun](https://img.shields.io/badge/Bun-1.0+-green.svg)](https://bun.sh/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
-[![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.30+-green.svg)](https://orm.drizzle.team/)
-[![SQLite](https://img.shields.io/badge/SQLite-3.9.0+-green.svg)](https://sqlite.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-green.svg)](https://www.postgresql.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-8+-green.svg)](https://www.mysql.com/)
-
----
-
 ## Installation
 
-You can install **Drizzle-Castor** from either **NPM** or **JSR** depending on your environment preference.
-
-### Via NPM
-Available under the `@fajarnugraha37` scope:
+You can install **Drizzle-Castor** from either [**NPM**](https://www.npmjs.com/package/@fajarnugraha37/drizzle-castor) or [**JSR**](https://jsr.io/@fajar/drizzle-castor) depending on your environment preference.
 
 ```bash
-# Using bun (recommended)
+### Via NPM
 bun add @fajarnugraha37/drizzle-castor
-
-# Using npm
 npm install @fajarnugraha37/drizzle-castor
-
-# Using pnpm
 pnpm add @fajarnugraha37/drizzle-castor
-
-# Using yarn
 yarn add @fajarnugraha37/drizzle-castor
-```
 
 ### Via JSR
-Available under the `@fajar` scope. Recommended for Deno or ESM-first projects:
-
-```bash
-# Using bun
 bunx jsr add @fajar/drizzle-castor
-
-# Using npx
 npx jsr add @fajar/drizzle-castor
-
-# Using deno
 deno add jsr:@fajar/drizzle-castor
 ```
 

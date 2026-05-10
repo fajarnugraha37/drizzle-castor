@@ -1,55 +1,37 @@
 import { describe, test, before, after } from "node:test";
 import { expect } from "expect";
 import { MySqlContainer, StartedMySqlContainer } from "@testcontainers/mysql";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
-import { sql } from "drizzle-orm";
 import { createSchemaBuilder } from "../../../src";
-import { users, profiles, posts } from "./schema";
+import { users, profiles, posts, migrations } from "./schema";
 
 describe("MySQL Integration - Create Operations", () => {
   let container: StartedMySqlContainer;
   let connection: mysql.Connection;
-  let db: any;
+  let db: MySql2Database;
   let builder: any;
 
   before(async () => {
-    container = await new MySqlContainer("mysql:8.0").start();
+    container = await new MySqlContainer("mysql:8.0")
+      .withCommand([
+        "--skip-log-bin",
+        "--performance-schema=OFF",
+        "--innodb-buffer-pool-size=64M",
+        "--sync-binlog=0",
+        "--innodb-flush-log-at-trx-commit=2", // test-safe, lebih cepat
+      ])
+      .withBindMounts([])
+      .withTmpFs({ "/var/lib/mysql": "rw" })
+      .start();
     connection = await mysql.createConnection(container.getConnectionUri());
     db = drizzle(connection, {
       logger: true,
     });
 
-    await db.execute(sql`
-      CREATE TABLE users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name TEXT NOT NULL,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        age INT,
-        metadata JSON,
-        settings JSON,
-        deleted_flag INT DEFAULT 0,
-        deleted_at TIMESTAMP NULL
-      )
-    `);
-
-    await db.execute(sql`
-      CREATE TABLE profiles (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        bio TEXT,
-        user_id INT NOT NULL
-      )
-    `);
-
-    await db.execute(sql`
-      CREATE TABLE posts (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        title TEXT NOT NULL,
-        content TEXT,
-        author_id INT,
-        deleted_flag INT DEFAULT 0
-      )
-    `);
+    for (const migration of migrations) {
+      await db.execute(migration);
+    }
 
     builder = createSchemaBuilder(db, [users, profiles, posts] as const, "lenient")
       .table("users", {

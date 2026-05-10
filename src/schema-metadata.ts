@@ -5,13 +5,15 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
 import { findBaseTable } from "./helper";
-import type { AnyDatabase, TSchemaMetadata, TTableNames, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, GlobalPolicyDefinition, CastorEvents, LoggerConfig, CastorInstance } from "./types";
+import { ConfigurationError } from "./errors";
+import { sql } from "drizzle-orm";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, GlobalPolicyDefinition, CastorEvents, LoggerConfig, CastorInstance, TransactionOptions } from "./types";
 import { composeMiddleware } from "./middleware";
 import { createUnifiedRbacMiddleware } from "./middleware/unified-rbac";
 import type { ExecutionContext } from "./types/context";
-import { runInContext, endExecutionContext, useExecutionContext } from "./context/manager";
+import { runInContext, endExecutionContext, useExecutionContext, getExecutionContext } from "./context/manager";
 import type { Emitter } from "mitt";
-import { CastorLogger } from "./helper/logger-helper";
+import { CastorLogger, getDialect, executeRaw } from "./helper";
 
 export function defineSchemaMetadata<
   TDb extends AnyDatabase,
@@ -26,7 +28,8 @@ export function defineSchemaMetadata<
   emitter?: Emitter<CastorEvents>,
   loggerConfig?: LoggerConfig,
   isThrowError: boolean = false,
-  traceIdGenerator?: TraceIdGenerator
+  traceIdGenerator?: TraceIdGenerator,
+  transactionOptions?: TransactionOptions
 ): <const TMetadata extends TSchemaMetadata<TDb, TTables>>(metadata: TMetadata) => CastorInstance<TDb, TTables, TMetadata> {
   const logger = new CastorLogger(loggerConfig);
 
@@ -48,198 +51,316 @@ export function defineSchemaMetadata<
       };
     };
 
-    const repoFactory = <
-      TName extends TTableNames<TDb, TTables, TMetadata>,
-    >(
-      tableName: TName,
-    ): Repository<
-      TSchemaContext<TDb, TTables, TMetadata>,
-      TName
-    > => {
-      logger.debug(`Creating repository for table '${tableName as string}'`);
-      const translatorContext = {
-        db,
-        tables,
-        metadata,
-        baseTableName: tableName,
-        telemetrySubscribers,
-        emitter,
-        logger,
-      };
-      
-      let policyDef = registeredPolicies.get(tableName as string);
-      
-      if (!policyDef && globalPolicy) {
-        policyDef = async (ctx: any, activeProfiles: string[]) => {
-          return globalPolicy(ctx, tableName as string, activeProfiles);
+    const createInstance = (activeDb: TDb, isTransaction: boolean = false): CastorInstance<TDb, TTables, TMetadata> => {
+      const repoFactory = <
+        TName extends TTableNames<TDb, TTables, TMetadata>,
+      >(
+        tableName: TName,
+      ): Repository<
+        TSchemaContext<TDb, TTables, TMetadata>,
+        TName
+      > => {
+        logger.debug(`Creating repository for table '${tableName as string}'`);
+        const translatorContext = {
+          db: activeDb,
+          tables,
+          metadata,
+          baseTableName: tableName,
+          telemetrySubscribers,
+          emitter,
+          logger,
         };
-      }
-
-      const unifiedRbacMiddleware = createUnifiedRbacMiddleware(policyDef, mode, isThrowError);
-
-      const applicableMiddlewares: Middleware[] = [];
-
-      for (const { middleware, config } of registeredMiddlewares) {
-        // If config.tables is defined and doesn't include this table, skip it
-        if (config?.tables) {
-          const allowedTables = Array.isArray(config.tables) ? config.tables : [config.tables];
-          if (!allowedTables.includes(tableName)) {
-            continue;
-          }
+        
+        let policyDef = registeredPolicies.get(tableName as string);
+        
+        if (!policyDef && globalPolicy) {
+          policyDef = async (ctx: any, activeProfiles: string[]) => {
+            return globalPolicy(ctx, tableName as string, activeProfiles);
+          };
         }
 
-        // Wrap middleware to conditionally execute based on action
-        const wrappedMiddleware: Middleware = async (ctx, next) => {
-          if (config?.actions) {
-            const allowedActions = Array.isArray(config.actions) ? config.actions : [config.actions];
-            if (!allowedActions.includes(ctx.action)) {
-              return next();
+        const unifiedRbacMiddleware = createUnifiedRbacMiddleware(policyDef, mode, isThrowError);
+
+        const applicableMiddlewares: Middleware[] = [];
+
+        for (const { middleware, config } of registeredMiddlewares) {
+          // If config.tables is defined and doesn't include this table, skip it
+          if (config?.tables) {
+            const allowedTables = Array.isArray(config.tables) ? config.tables : [config.tables];
+            if (!allowedTables.includes(tableName)) {
+              continue;
             }
           }
-          return middleware(ctx, next);
+
+          // Wrap middleware to conditionally execute based on action
+          const wrappedMiddleware: Middleware = async (ctx, next) => {
+            if (config?.actions) {
+              const allowedActions = Array.isArray(config.actions) ? config.actions : [config.actions];
+              if (!allowedActions.includes(ctx.action)) {
+                return next();
+              }
+            }
+            return middleware(ctx, next);
+          };
+
+          applicableMiddlewares.push(wrappedMiddleware);
+        }
+
+        // Stack: Global & Table Middlewares -> Unified RBAC -> Core Action
+        const pipeline = composeMiddleware([
+          ...applicableMiddlewares,
+          unifiedRbacMiddleware
+        ]);
+
+        const baseTable = findBaseTable(tables, tableName);
+
+        const executeWithMiddleware = (action: DbAction, profile: any, params: any, coreFn: any) => {
+          return runInContext(
+            {
+              action,
+              tableName,
+              profile,
+              params,
+              metadata: {}, // Initial empty metadata
+              isInTransaction: isTransaction,
+              translatorContext,
+            },
+            async () => {
+              const ctx = useExecutionContext();
+              logger.info(`Starting ${action} on ${tableName}`);
+              logger.trace(`Operation params: %{params}`);
+
+              try {
+                const result = await pipeline(ctx, async () => {
+                  logger.debug(`Executing core database logic for ${action} on ${tableName}`);
+                  return coreFn(ctx);
+                });
+                logger.info(`Successfully completed ${action} on ${tableName} in %{duration}ms`);
+                endExecutionContext("success");
+                return result;
+              } catch (err: any) {
+                logger.error(`Failed execution of ${action} on ${tableName}: ${err.message}`, err);
+                endExecutionContext("failed", err);
+                throw err;
+              }
+            },
+            traceIdGenerator
+          );
         };
 
-        applicableMiddlewares.push(wrappedMiddleware);
-      }
+        return {
+          // --- FACTORY METHODS ---
+          defineFilter: (f) => f,
+          defineProjection: (p) => p,
+          defineQuery: (q) => q,
+          defineUpdateSet: (s) => s,
+          defineInsertValue: (i) => i,
 
-      // Stack: Global & Table Middlewares -> Unified RBAC -> Core Action
-      const pipeline = composeMiddleware([
-        ...applicableMiddlewares,
-        unifiedRbacMiddleware
-      ]);
-
-      const baseTable = findBaseTable(tables, tableName);
-
-      const executeWithMiddleware = (action: DbAction, profile: any, params: any, coreFn: any) => {
-        return runInContext(
-          {
-            action,
-            tableName,
-            profile,
-            params,
-            metadata: {}, // Initial empty metadata
-            translatorContext,
+          createOne: async (data, profile) => {
+            return executeWithMiddleware("create", profile, { data }, (ctx: ExecutionContext) => 
+              executeCreateOne(ctx, baseTable)
+            );
           },
-          async () => {
-            const ctx = useExecutionContext();
-            logger.info(`Starting ${action} on ${tableName}`);
-            logger.trace(`Operation params: %{params}`);
+          createMany: async (data, profile) => {
+            return executeWithMiddleware("create", profile, { data }, (ctx: ExecutionContext) => 
+              executeCreateMany(ctx, baseTable)
+            );
+          },
+          searchOne: async (query, profile) => {
+             return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
+              executeSearchOne(ctx)
+            );
+          },
+          searchPage: async (query, profile) => {
+            return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
+              executeSearchPage(ctx)
+            );
+          },
+          searchMany: async (query, profile) => {
+             return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
+              executeSearchMany(ctx)
+            );
+          },
+          searchDeletedOne: async (query, profile) => {
+            return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
+              executeSearchDeletedOne(ctx)
+            );
+          },
+          searchDeletedPage: async (query, profile) => {
+             return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
+              executeSearchDeletedPage(ctx)
+            );
+          },
+          searchDeletedMany: async (query, profile) => {
+             return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
+              executeSearchDeletedMany(ctx)
+            );
+          },
+          updateOne: async (id, set, profile) => {
+             return executeWithMiddleware("update", profile, { id, set }, (ctx: ExecutionContext) => 
+              executeUpdateOne(ctx, baseTable)
+            );
+          },
+          updateMany: async (filter, set, profile) => {
+            return executeWithMiddleware("update", profile, { filter, set }, (ctx: ExecutionContext) => 
+              executeUpdateMany(ctx, baseTable)
+            );
+          },
+          softDeleteOne: async (id, profile) => {
+            return executeWithMiddleware("softDelete", profile, { id }, (ctx: ExecutionContext) => 
+              executeSoftDeleteOne(ctx, baseTable)
+            );
+          },
+          softDeleteMany: async (filter, profile) => {
+            return executeWithMiddleware("softDelete", profile, { filter }, (ctx: ExecutionContext) => 
+              executeSoftDeleteMany(ctx, baseTable)
+            );
+          },
+          restoreOne: async (id, profile) => {
+            return executeWithMiddleware("restore", profile, { id }, (ctx: ExecutionContext) => 
+              executeRestoreOne(ctx, baseTable)
+            );
+          },
+          restoreMany: async (filter, profile) => {
+            return executeWithMiddleware("restore", profile, { filter }, (ctx: ExecutionContext) => 
+              executeRestoreMany(ctx, baseTable)
+            );
+          },
+          hardDeleteOne: async (id, profile) => {
+             return executeWithMiddleware("hardDelete", profile, { id }, (ctx: ExecutionContext) => 
+              executeHardDeleteOne(ctx, baseTable)
+            );
+          },
+          hardDeleteMany: async (filter, profile) => {
+            return executeWithMiddleware("hardDelete", profile, { filter }, (ctx: ExecutionContext) => 
+              executeHardDeleteMany(ctx, baseTable)
+            );
+          },
+        };
+      };
 
-            try {
-              const result = await pipeline(ctx, async () => {
-                logger.debug(`Executing core database logic for ${action} on ${tableName}`);
-                return coreFn(ctx);
-              });
-              logger.info(`Successfully completed ${action} on ${tableName} in %{duration}ms`);
-              endExecutionContext("success");
-              return result;
-            } catch (err: any) {
-              logger.error(`Failed execution of ${action} on ${tableName}: ${err.message}`, err);
-              endExecutionContext("failed", err);
-              throw err;
+      const transaction = async <T>(
+        callback: (tx: CastorInstance<TDb, TTables, TMetadata>) => Promise<T>,
+        options?: TransactionOptions,
+      ): Promise<T> => {
+        const mergedOptions = { ...transactionOptions, ...options };
+        const propagation = mergedOptions.propagation || "REQUIRED";
+        
+        const currentCtx = getExecutionContext();
+        // CRITICAL FIX: Use the DB handle from context if already in transaction to allow proper nesting/joining
+        // even when transaction() is called on the root instance.
+        const dbToUse = (currentCtx?.isInTransaction) ? currentCtx.translatorContext.db : activeDb;
+        const isInActiveTransaction = isTransaction || currentCtx?.isInTransaction || false;
+        
+        const dialect = getDialect(dbToUse);
+        const isSQLite = dialect === "sqlite";
+
+        logger.debug(`Starting transaction block with propagation: ${propagation}, dialect: ${dialect}`);
+
+        const executeInNewTransaction = async () => {
+          // Handle SQLite async transaction bug in native drivers
+          if (isSQLite) {
+             const isNested = isInActiveTransaction;
+             const spName = isNested ? `sp_inst_${Date.now()}_${Math.floor(Math.random() * 1000)}` : null;
+             
+             const beginSql = spName ? sql`SAVEPOINT ${sql.identifier(spName)}` : sql`BEGIN TRANSACTION`;
+             const commitSql = spName ? sql`RELEASE SAVEPOINT ${sql.identifier(spName)}` : sql`COMMIT`;
+             const rollbackSql = spName ? sql`ROLLBACK TO SAVEPOINT ${sql.identifier(spName)}` : sql`ROLLBACK`;
+
+             await executeRaw(dbToUse, beginSql);
+             try {
+                const txInstance = createInstance(dbToUse, true);
+                const result = await runInContext({
+                  action: "transaction" as any,
+                  tableName: "all",
+                  params: mergedOptions,
+                  isInTransaction: true,
+                  translatorContext: {
+                    ...(currentCtx?.translatorContext || {
+                      tables,
+                      metadata,
+                      telemetrySubscribers,
+                      emitter,
+                      logger
+                    }),
+                    db: dbToUse,
+                    baseTableName: "all" as any,
+                  }
+                } as any, () => callback(txInstance));
+                await executeRaw(dbToUse, commitSql);
+                return result;
+             } catch (e) {
+                await executeRaw(dbToUse, rollbackSql);
+                throw e;
+             }
+          }
+
+          // For Async drivers (PG, MySQL)
+          return await dbToUse.transaction(async (tx: any) => {
+            const txInstance = createInstance(tx, true);
+            // Wrap in context so that any code inside the callback sees the transaction
+            return await runInContext({
+              action: "transaction" as any,
+              tableName: "all",
+              params: mergedOptions, // Pass options to telemetry
+              isInTransaction: true,
+              translatorContext: {
+                // If we have an existing context, preserve its other properties (emitters, etc.)
+                ...(currentCtx?.translatorContext || {
+                  tables,
+                  metadata,
+                  telemetrySubscribers,
+                  emitter,
+                  logger
+                }),
+                db: tx,
+                baseTableName: "all" as any,
+              }
+            } as any, () => callback(txInstance));
+          }, mergedOptions as any);
+        };
+
+        switch (propagation) {
+          case "REQUIRED":
+            if (isInActiveTransaction) {
+              return await callback(createInstance(dbToUse, true));
             }
-          },
-          traceIdGenerator
-        );
+            return await executeInNewTransaction();
+
+          case "REQUIRES_NEW":
+          case "NESTED":
+            return await executeInNewTransaction();
+
+          case "SUPPORTS":
+            return await callback(createInstance(dbToUse, isInActiveTransaction));
+
+          case "MANDATORY":
+            if (!isInActiveTransaction) {
+              throw new ConfigurationError("Transaction propagation 'MANDATORY' failed: No active transaction found.");
+            }
+            return await callback(createInstance(dbToUse, true));
+
+          case "NEVER":
+            if (isInActiveTransaction) {
+              throw new ConfigurationError("Transaction propagation 'NEVER' failed: Active transaction found.");
+            }
+            return await callback(createInstance(dbToUse, false));
+
+          default:
+            return await executeInNewTransaction();
+        }
       };
 
       return {
-        // --- FACTORY METHODS ---
-        defineFilter: (f) => f,
-        defineProjection: (p) => p,
-        defineQuery: (q) => q,
-        defineUpdateSet: (s) => s,
-        defineInsertValue: (i) => i,
-
-        createOne: async (data, profile) => {
-          return executeWithMiddleware("create", profile, { data }, (ctx: ExecutionContext) => 
-            executeCreateOne(ctx, baseTable)
-          );
-        },
-        createMany: async (data, profile) => {
-          return executeWithMiddleware("create", profile, { data }, (ctx: ExecutionContext) => 
-            executeCreateMany(ctx, baseTable)
-          );
-        },
-        searchOne: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
-            executeSearchOne(ctx)
-          );
-        },
-        searchPage: async (query, profile) => {
-          return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
-            executeSearchPage(ctx)
-          );
-        },
-        searchMany: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
-            executeSearchMany(ctx)
-          );
-        },
-        searchDeletedOne: async (query, profile) => {
-          return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
-            executeSearchDeletedOne(ctx)
-          );
-        },
-        searchDeletedPage: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
-            executeSearchDeletedPage(ctx)
-          );
-        },
-        searchDeletedMany: async (query, profile) => {
-           return executeWithMiddleware("read", profile, { query }, (ctx: ExecutionContext) => 
-            executeSearchDeletedMany(ctx)
-          );
-        },
-        updateOne: async (id, set, profile) => {
-           return executeWithMiddleware("update", profile, { id, set }, (ctx: ExecutionContext) => 
-            executeUpdateOne(ctx, baseTable)
-          );
-        },
-        updateMany: async (filter, set, profile) => {
-          return executeWithMiddleware("update", profile, { filter, set }, (ctx: ExecutionContext) => 
-            executeUpdateMany(ctx, baseTable)
-          );
-        },
-        softDeleteOne: async (id, profile) => {
-          return executeWithMiddleware("softDelete", profile, { id }, (ctx: ExecutionContext) => 
-            executeSoftDeleteOne(ctx, baseTable)
-          );
-        },
-        softDeleteMany: async (filter, profile) => {
-          return executeWithMiddleware("softDelete", profile, { filter }, (ctx: ExecutionContext) => 
-            executeSoftDeleteMany(ctx, baseTable)
-          );
-        },
-        restoreOne: async (id, profile) => {
-          return executeWithMiddleware("restore", profile, { id }, (ctx: ExecutionContext) => 
-            executeRestoreOne(ctx, baseTable)
-          );
-        },
-        restoreMany: async (filter, profile) => {
-          return executeWithMiddleware("restore", profile, { filter }, (ctx: ExecutionContext) => 
-            executeRestoreMany(ctx, baseTable)
-          );
-        },
-        hardDeleteOne: async (id, profile) => {
-           return executeWithMiddleware("hardDelete", profile, { id }, (ctx: ExecutionContext) => 
-            executeHardDeleteOne(ctx, baseTable)
-          );
-        },
-        hardDeleteMany: async (filter, profile) => {
-          return executeWithMiddleware("hardDelete", profile, { filter }, (ctx: ExecutionContext) => 
-            executeHardDeleteMany(ctx, baseTable)
-          );
-        },
+        db: activeDb,
+        tables,
+        metadata,
+        repoFactory,
+        subscribeToTelemetry,
+        transaction,
       };
     };
 
-    return {
-      db,
-      tables,
-      metadata,
-      repoFactory,
-      subscribeToTelemetry,
-    };
+    return createInstance(db);
   };
 }
