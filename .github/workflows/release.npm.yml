@@ -1,6 +1,7 @@
 name: Release to NPM
 
 on:
+  workflow_dispatch: # Allows manual execution
   push:
     tags:
       - 'v*'
