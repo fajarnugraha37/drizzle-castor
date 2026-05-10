@@ -1,8 +1,25 @@
 {
-  "name": "@fajarnugraha37/drizzle-castor",
-  "private": false,
-  "version": "0.2.1",
+  "name": "drizzle-castor",
+  "version": "0.1.0",
   "description": "A CRUD library for Drizzle ORM, designed to simplify database operations with a focus on type safety and ease of use.",
+  "private": false,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "QUICKSTART.md",
+    "LICENSE"
+  ],
   "keywords": [
     "drizzle",
     "orm",
@@ -21,51 +38,37 @@
     "url": "https://github.com/fajarnugraha37/drizzle-castor.git"
   },
   "license": "MIT",
-  "main": "dist/index.cjs",
-  "module": "dist/index.mjs",
-  "type": "module",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
-    }
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "QUICKSTART.md",
-    "LICENSE"
-  ],
   "scripts": {
     "example:main": "bun run example/index.ts --main",
     "example:seed": "bun run example/index.ts --seed",
     "example:tsc": "bunx tsc example/index.ts --noEmit",
     "build": "rm -rf dist && bunx tsc && bunx tsup",
     "test": "bun test --isolate",
-    "test:watch": "bun test --isolate --watch",
-    "test:pg": "node --import tsx --test --experimental-test-coverage .\\tests\\integration\\postgresql\\*.test.ts",
-    "test:mysql": "node --import tsx --test --experimental-test-coverage .\\tests\\integration\\mysql\\*.test.ts",
-    "test:sqlite": "bun test ./tests/integration/sqlite/ --isolate",
-    "coverage:view": "open coverage/lcov-report/index.html",
-    "action:validate": "act --action-offline-mode --workflows ./.github/workflows/validate.yml",
-    "action:publish": "act --action-offline-mode --workflows ./.github/workflows/publish.yml --secret-file .secrets"
+    "test:unit": "bun test ./tests/unit --isolate --exit",
+    "test:sqlite": "bun test ./tests/integration/sqlite --exit",
+    "test:pg": "node --import tsx --test ./tests/integration/postgresql/*.test.ts",
+    "test:mysql": "node --import tsx --test ./tests/integration/mysql/*.test.ts",
+    "lint": "eslint src/** tests/**",
+    "release": "changeset publish",
+    "tag": "changeset tag"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@faker-js/faker": "^10.4.0",
     "@testcontainers/mysql": "^11.14.0",
     "@testcontainers/postgresql": "^11.14.0",
-    "@types/bun": "latest",
-    "@types/node": "^25.6.0",
+    "@types/bun": "^1.3.13",
+    "@types/node": "^25.6.2",
     "@types/pg": "^8.20.0",
     "better-sqlite3": "^12.9.0",
+    "bun-types": "^1.3.13",
     "drizzle-kit": "^0.31.10",
     "expect": "^30.4.1",
     "glob": "^13.0.6",
     "mysql2": "^3.22.3",
     "pg": "^8.20.0",
     "testcontainers": "^11.14.0",
+    "ts-node": "^10.9.2",
     "tsup": "^8.5.1",
     "tsx": "^4.21.0"
   },

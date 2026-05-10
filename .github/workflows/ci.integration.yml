@@ -1,0 +1,64 @@
+name: Manual Integration Tests
+
+on:
+  workflow_dispatch: # Allows manual execution only
+
+jobs:
+  integration-test:
+    name: Database Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build project
+        run: bun run build
+
+      - name: Run SQLite Integration Tests
+        run: |
+          bun test ./tests/integration/sqlite --exit --exit > sqlite_test_output.txt 2>&1 || true
+          cat sqlite_test_output.txt
+          if grep -q "0 fail" sqlite_test_output.txt; then
+            echo "SQLite integration tests passed"
+            exit 0
+          else
+            echo "SQLite integration tests failed"
+            exit 1
+          fi
+
+      - name: Run PostgreSQL Integration Tests
+        run: |
+          node --import tsx --test tests/integration/postgresql/*.test.ts > pg_test_output.txt 2>&1 || true
+          cat pg_test_output.txt
+          if grep -q "fail 0" pg_test_output.txt; then
+            echo "PostgreSQL integration tests passed"
+            exit 0
+          else
+            echo "PostgreSQL integration tests failed"
+            exit 1
+          fi
+
+      - name: Run MySQL Integration Tests
+        run: |
+          node --import tsx --test tests/integration/mysql/*.test.ts > mysql_test_output.txt 2>&1 || true
+          cat mysql_test_output.txt
+          if grep -q "fail 0" mysql_test_output.txt; then
+            echo "MySQL integration tests passed"
+            exit 0
+          else
+            echo "MySQL integration tests failed"
+            exit 1
+          fi

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Build & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type Check
+        run: bunx tsc --noEmit
+
+      - name: Build
+        run: bun run build
+
+      - name: Run Unit Tests
+        run: |
+          bun test --isolate --coverage --exit > test_output.txt 2>&1 || true
+          cat test_output.txt
+          if grep -q "0 fail" test_output.txt; then
+            echo "All unit tests passed"
+            exit 0
+          else
+            echo "Unit tests failed"
+            exit 1
+          fi
+      
+      - name: Run SQLite Integration Tests
+        run: |
+          bun test ./tests/integration/sqlite --exit --exit > sqlite_test_output.txt 2>&1 || true
+          cat sqlite_test_output.txt
+          if grep -q "0 fail" sqlite_test_output.txt; then
+            echo "SQLite integration tests passed"
+            exit 0
+          else
+            echo "SQLite integration tests failed"
+            exit 1
+          fi

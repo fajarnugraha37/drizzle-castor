@@ -1,0 +1,39 @@
+name: Release Orchestrator
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Versioning & Tagging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Create Release PR or Create Tag/Release
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          # Use 'tag' script instead of 'publish' to only generate tags and GH Releases
+          publish: bun run tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
