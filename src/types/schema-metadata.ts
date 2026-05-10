@@ -12,6 +12,7 @@ import type { Emitter } from "mitt";
 import type { CastorEvents } from "./telemetry";
 import type { TableConfig } from "./hook";
 import type { ILogger } from "./logger";
+import type { Repository } from "./repository";
 
 export type AnyDatabase =
   | BunSQLiteDatabase
@@ -125,3 +126,19 @@ export type TTableNames<
   TTables extends readonly AnyTable[],
   TMetadata extends TSchemaMetadata<TDb, TTables>,
 > = keyof TMetadata & string;
+
+export type CastorInstance<
+  TDb extends AnyDatabase = AnyDatabase,
+  TTables extends readonly AnyTable[] = any,
+  TMetadata extends Record<string, any> = any,
+> = {
+  db: TDb;
+  tables: TTables;
+  metadata: TMetadata;
+  repoFactory: <TName extends TTableNames<TDb, TTables, TMetadata>>(
+    tableName: TName,
+  ) => Repository<TSchemaContext<TDb, TTables, TMetadata>, TName>;
+  subscribeToTelemetry: (
+    subscriber: (ctx: any) => void | Promise<void>,
+  ) => () => void;
+};

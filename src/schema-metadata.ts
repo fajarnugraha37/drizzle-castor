@@ -5,7 +5,7 @@ import { executeHardDeleteOne, executeHardDeleteMany } from "./mutations/delete"
 import { executeSoftDeleteOne, executeSoftDeleteMany } from "./mutations/soft-delete";
 import { executeRestoreOne, executeRestoreMany } from "./mutations/restore";
 import { findBaseTable } from "./helper";
-import type { AnyDatabase, TSchemaMetadata, TTableNames, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, GlobalPolicyDefinition, CastorEvents, LoggerConfig } from "./types";
+import type { AnyDatabase, TSchemaMetadata, TTableNames, Repository, TSchemaContext, DbAction, AnyTable, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, GlobalPolicyDefinition, CastorEvents, LoggerConfig, CastorInstance } from "./types";
 import { composeMiddleware } from "./middleware";
 import { createUnifiedRbacMiddleware } from "./middleware/unified-rbac";
 import type { ExecutionContext } from "./types/context";
@@ -27,7 +27,7 @@ export function defineSchemaMetadata<
   loggerConfig?: LoggerConfig,
   isThrowError: boolean = false,
   traceIdGenerator?: TraceIdGenerator
-) {
+): <const TMetadata extends TSchemaMetadata<TDb, TTables>>(metadata: TMetadata) => CastorInstance<TDb, TTables, TMetadata> {
   const logger = new CastorLogger(loggerConfig);
 
   if (mode === "lenient") {

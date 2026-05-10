@@ -1,6 +1,6 @@
 import mitt from "mitt";
 import { defineSchemaMetadata } from "./schema-metadata";
-import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition, CastorEvents, LoggerConfig } from "./types";
+import type { AnyDatabase, AnyTable, TableName, TSchemaMetadata, TraceIdGenerator, Middleware, MiddlewareConfig, PolicyDefinition, TSchemaContext, GlobalPolicyDefinition, CastorEvents, LoggerConfig, CastorInstance } from "./types";
 import { logger } from "./helper/logger-helper";
 
 export class SchemaBuilder<
@@ -43,15 +43,16 @@ export class SchemaBuilder<
     return newBuilder;
   }
 
-  on<K extends keyof CastorEvents>(type: K, handler: (event: CastorEvents[K]) => void) {
+  on<K extends keyof CastorEvents>(type: K, handler: (event: CastorEvents[K]) => void): this {
     this.emitter.on(type, handler);
     return this;
   }
 
-  off<K extends keyof CastorEvents>(type: K, handler: (event: CastorEvents[K]) => void) {
+  off<K extends keyof CastorEvents>(type: K, handler: (event: CastorEvents[K]) => void): this {
     this.emitter.off(type, handler);
     return this;
   }
+
 
   policies(policy: GlobalPolicyDefinition<TSchemaContext<TDb, TTables, TMetadata>, TProfiles[number]>): this;
   policies<TName extends TableName<TTables[number]>>(
@@ -117,7 +118,7 @@ export class SchemaBuilder<
     return this;
   }
 
-  build() {
+  build(): CastorInstance<TDb, TTables, TMetadata> {
     logger.info(`Building SchemaMetadata for ${Object.keys(this.metadata).length} tables`);
     const finalMetadata = this.metadata as unknown as TMetadata;
     return defineSchemaMetadata(
@@ -138,6 +139,6 @@ export class SchemaBuilder<
 export function createSchemaBuilder<
   TDb extends AnyDatabase,
   TTables extends readonly AnyTable[],
->(db: TDb, tables: TTables, mode: "strict" | "lenient" = "lenient") {
+>(db: TDb, tables: TTables, mode: "strict" | "lenient" = "lenient"): SchemaBuilder<TDb, TTables> {
   return new SchemaBuilder(db, tables, mode);
 }
